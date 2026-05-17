@@ -111,8 +111,7 @@ class ControlActivity : AppCompatActivity() {
                     if (basePacket["Type"] == "system" && basePacket["Action"] == "disconnect") {
                         val message = basePacket["Message"] as? String
                         runOnUiThread {
-                            val toastMsg = if (message == "host_shutdown") "Server closed connection" else "Disconnected"
-                            Toast.makeText(this@ControlActivity, toastMsg, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this@ControlActivity, message, Toast.LENGTH_SHORT).show()
                             finish()
                         }
                         break

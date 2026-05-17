@@ -1,4 +1,5 @@
-﻿using System;
+﻿using AirMouse_Host.models;
+using System;
 using System.Linq;
 
 namespace AirMouse_Host
@@ -10,17 +11,27 @@ namespace AirMouse_Host
         private static readonly Random _rnd = new Random();
 
         public string CurrentPin { get; private set; }
+        public AppSettings Settings { get; private set; }
 
-        // Довжина передається при створенні об'єкта, за замовчуванням 6
-        public AuthManager(int codeLength = 6)
+        public AuthManager(AppSettings settings, int codeLength = 6)
         {
             _codeLength = codeLength;
-            GeneratePin();
+            Settings = settings;
+            RefreshPin();
         }
-
-        public void GeneratePin()
+        public void RefreshPin()
         {
-            // Генеруємо рядок випадкових символів заданої довжини
+            if (Settings.UseStaticPin)
+            {
+                CurrentPin = Settings.StaticPin;
+            }
+            else
+            {
+                GenerateDynamicPin();
+            }
+        }
+        public void GenerateDynamicPin()
+        {
             char[] result = new char[_codeLength];
             for (int i = 0; i < _codeLength; i++)
             {
@@ -28,6 +39,18 @@ namespace AirMouse_Host
             }
 
             CurrentPin = new string(result);
+        }
+
+        public void ToggleStaticPin(bool useStatic, string customPin = null)
+        {
+            Settings.UseStaticPin = useStatic;
+            if (useStatic && !string.IsNullOrEmpty(customPin))
+            {
+                Settings.StaticPin = customPin;
+            }
+
+            SettingsManager.Save(Settings);
+            RefreshPin();
         }
 
         public bool Validate(string pin)

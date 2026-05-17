@@ -40,49 +40,47 @@ namespace AirMouse_Host
 
         private void HandleClient(TcpClient client)
         {
-            try
+            var stream = client.GetStream();
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+
+            string json = reader.ReadLine();
+
+            if (string.IsNullOrEmpty(json))
+                return;
+
+            using JsonDocument doc = JsonDocument.Parse(json);
+            string type = doc.RootElement.GetProperty("Type").GetString();
+
+            if (type == "auth")
+                HandleAuth(client, json);
+
+            if (CurrentSession == null)
             {
-                var stream = client.GetStream();
-                using var reader = new StreamReader(stream, Encoding.UTF8);
+                System.Diagnostics.Debug.WriteLine("No active session, ignoring commands");
+                return;
+            }
 
-                string json = reader.ReadLine();
+            while (CurrentSession != null)
+            {
+                if (client == null || !client.Connected)
+                    break;
 
-                if (string.IsNullOrEmpty(json))
-                    return;
-
-                using JsonDocument doc = JsonDocument.Parse(json);
-                string type = doc.RootElement.GetProperty("Type").GetString();
-
-                if (type == "auth")
-                    HandleAuth(client, json);
-
-                if (CurrentSession == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("No active session, ignoring commands");
-                    return;
-                }
-
-                while (true)
+                try
                 {
                     json = reader.ReadLine();
-                    if (string.IsNullOrEmpty(json))
+
+                    if (json == null)
                         break;
+
                     Execute(json);
                 }
+                catch (Exception ex) when (ex is ObjectDisposedException || ex is IOException)
+                {
+                    // Socket was closed, exit loop to clean up session
+                    break;
+                }
             }
-            catch (ObjectDisposedException)
-            {
-                // expected on disconnect
-            }
-            catch (IOException)
-            {
-                Disconnect();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine(ex.Message);
-                Disconnect();
-            }
+            Disconnect();
         }
 
         private void HandleAuth(TcpClient client, string json)
@@ -158,7 +156,7 @@ namespace AirMouse_Host
             OnStatusChanged?.Invoke("Waiting for device to connect");
         }
 
-        public void DisconnectFromHost()
+        public void DisconnectFromHost(string message = "Server closed connection")
         {
             if (CurrentSession == null)
                 return;
@@ -169,7 +167,7 @@ namespace AirMouse_Host
                 {
                     Type = "system",
                     Action = "disconnect",
-                    Message = "host_shutdown"
+                    Message = message
                 };
 
                 string json = JsonSerializer.Serialize(packet) + "\n";
