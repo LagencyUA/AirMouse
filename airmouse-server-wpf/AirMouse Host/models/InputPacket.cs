@@ -4,13 +4,10 @@ using System.Text;
 
 namespace AirMouse_Host.models
 {
-    public class Command
+    public class InputPacket
     {
         public string Type { get; set; }
-
-        public float DX { get; set; }
-        public float DY { get; set; }
-
-        public string Button { get; set; }
+        public string Action { get; set; }
+        public string Payload { get; set; } //json data for the action
     }
 }

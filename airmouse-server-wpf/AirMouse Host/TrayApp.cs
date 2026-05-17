@@ -82,6 +82,7 @@ namespace AirMouse_Host
         void Exit(object sender, EventArgs e)
         {
             tray.Visible = false;
+            server.DisconnectFromHost(); // Ensure we close all connections and stop the server
             Application.Exit();
         }
 

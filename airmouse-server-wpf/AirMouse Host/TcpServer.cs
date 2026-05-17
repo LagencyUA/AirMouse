@@ -1,10 +1,11 @@
 ﻿using AirMouse_Host.models;
+using AirMouse_Host.services;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using System.IO;
 using System.Text.Json;
 
 namespace AirMouse_Host
@@ -15,6 +16,8 @@ namespace AirMouse_Host
         private readonly AuthManager auth;
         public Session CurrentSession { get; private set; }
         public event Action<string> OnStatusChanged;
+
+        private readonly InputService inputService = new();
 
         public TcpServer(AuthManager authManager)
         {
@@ -51,11 +54,7 @@ namespace AirMouse_Host
                 string type = doc.RootElement.GetProperty("Type").GetString();
 
                 if (type == "auth")
-                {
-                    var packet = JsonSerializer.Deserialize<AuthPacket>(json);
-                    System.Diagnostics.Debug.WriteLine($"RECEIVED: {json}");
-                    HandleAuth(client, packet);
-                }
+                    HandleAuth(client, json);
 
                 if (CurrentSession == null)
                 {
@@ -66,25 +65,29 @@ namespace AirMouse_Host
                 while (true)
                 {
                     json = reader.ReadLine();
-
                     if (string.IsNullOrEmpty(json))
                         break;
-
-                    System.Diagnostics.Debug.WriteLine($"RAW: {json}");
-
-                    Command cmd = JsonSerializer.Deserialize<Command>(json);
-
-                    Execute(cmd);
+                    Execute(json);
                 }
             }
-            catch
+            catch (ObjectDisposedException)
             {
+                // expected on disconnect
+            }
+            catch (IOException)
+            {
+                Disconnect();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex.Message);
                 Disconnect();
             }
         }
 
-        private void HandleAuth(TcpClient client, AuthPacket packet)
+        private void HandleAuth(TcpClient client, string json)
         {
+            var packet = JsonSerializer.Deserialize<AuthPacket>(json);
             var stream = client.GetStream();
             bool valid = auth.Validate(packet.Pin);
             var response = new AuthResponse
@@ -114,16 +117,70 @@ namespace AirMouse_Host
             System.Diagnostics.Debug.WriteLine("Session started!");
         }
 
-        private void Execute(Command cmd)
+        private void HandleSystem(TcpClient client, string json)
         {
-            System.Diagnostics.Debug.WriteLine($"Command: {cmd.Type}"); // Debug
-            System.Diagnostics.Debug.WriteLine($"Command: {cmd.Button}"); // Debug
+            var packet = JsonSerializer.Deserialize<SystemPacket>(json);
+
+            if (packet?.Action == "disconnect")
+            {
+                System.Diagnostics.Debug.WriteLine("Client disconnected");
+
+                Disconnect();
+            }
+        }
+
+        private void Execute(string json)
+        {
+            System.Diagnostics.Debug.WriteLine($"RAW: {json}"); //debug
+            
+            var packet = JsonSerializer.Deserialize<InputPacket>(json);
+
+            switch (packet?.Type)
+            {
+                case "input":
+                    inputService.Process(packet);
+                    break;
+                case "system":
+                    HandleSystem(CurrentSession.Client, json);
+                    return;
+            }
         }
 
         private void Disconnect()
         {
+            try
+            {
+                CurrentSession?.Client?.Close();
+            }
+            catch { }
+
             CurrentSession = null;
             OnStatusChanged?.Invoke("Waiting for device to connect");
+        }
+
+        public void DisconnectFromHost()
+        {
+            if (CurrentSession == null)
+                return;
+
+            try
+            {
+                var packet = new SystemPacket
+                {
+                    Type = "system",
+                    Action = "disconnect",
+                    Message = "host_shutdown"
+                };
+
+                string json = JsonSerializer.Serialize(packet) + "\n";
+                byte[] bytes = Encoding.UTF8.GetBytes(json);
+                var stream = CurrentSession.Client.GetStream();
+
+                stream.Write(bytes, 0, bytes.Length);
+            }
+            catch { }
+
+            Disconnect();
         }
     }
 }

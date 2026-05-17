@@ -5,6 +5,17 @@
     android:layout_height="match_parent"
     android:padding="16dp">
 
+    <Button
+        android:id="@+id/btnDisconnect"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Disconnect"
+        android:backgroundTint="@color/design_default_color_error"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp" />
+
     <TextView
         android:id="@+id/connectedLabel"
         android:layout_width="wrap_content"
@@ -16,14 +27,45 @@
         app:layout_constraintTop_toTopOf="parent"
         android:layout_marginTop="32dp"/>
 
-    <Button
-        android:id="@+id/btnSendTest"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="Send Test"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/connectedLabel"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/connectedLabel" />
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="24dp">
+
+        <Button
+            android:id="@+id/btnMouseMove"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mouse Move (10, 10)" />
+
+        <Button
+            android:id="@+id/btnMouseButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mouse Left Click" />
+
+        <Button
+            android:id="@+id/btnMouseScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Mouse Scroll Down" />
+
+        <Button
+            android:id="@+id/btnKeyPress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Key Press (Enter)" />
+
+        <Button
+            android:id="@+id/btnKeyCombo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Key Combo (Ctrl+C)" />
+
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
