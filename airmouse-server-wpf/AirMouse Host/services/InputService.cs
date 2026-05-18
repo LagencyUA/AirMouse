@@ -40,20 +40,20 @@ namespace AirMouse_Host.services
 
         private void HandleMouseMove(string payload)
         {
-            var data = JsonSerializer.Deserialize<MousePayload>(payload);
-            mouse.Move(data.DX, data.DY);
+            var data = JsonSerializer.Deserialize<MousePayload>(payload) ?? new MousePayload();
+            mouse.Move(data.DX.GetValueOrDefault(), data.DY.GetValueOrDefault());
         }
 
         private void HandleMouseButton(string payload)
         {
-            var data = JsonSerializer.Deserialize<MousePayload>(payload);
-            mouse.Click(data.Button, data.State);
+            var data = JsonSerializer.Deserialize<MousePayload>(payload) ?? new MousePayload();
+            mouse.Click(data.Button ?? string.Empty, data.State ?? string.Empty);
         }
 
         private void HandleScroll(string payload)
         {
-            var data = JsonSerializer.Deserialize<MousePayload>(payload);
-            mouse.Scroll(data.Scroll);
+            var data = JsonSerializer.Deserialize<MousePayload>(payload) ?? new MousePayload();
+            mouse.Scroll(data.Scroll.GetValueOrDefault());
         }
 
         private void HandleKey(string payload)
