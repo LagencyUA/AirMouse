@@ -18,23 +18,36 @@ namespace AirMouse_Host
         public event Action<string> OnStatusChanged;
 
         private readonly InputService inputService = new();
+        private readonly AppSettings Settings;
 
-        public TcpServer(AuthManager authManager)
+        private bool isStopping = false;
+
+        public TcpServer(AppSettings settings, AuthManager authManager)
         {
             auth = authManager;
-            server = new TcpListener(IPAddress.Any, 5000);
+            Settings = settings;
         }
 
         public async Task StartAsync()
         {
+            isStopping = false;
+            server = new TcpListener(IPAddress.Any, Settings.Port);
             server.Start();
             OnStatusChanged?.Invoke("Waiting for device to connect");
 
-            while (true)
+            try
             {
-                TcpClient client = await server.AcceptTcpClientAsync();
+                while (!isStopping)
+                {
+                    TcpClient client = await server.AcceptTcpClientAsync();
 
-                _ = Task.Run(() => HandleClient(client));
+                    _ = Task.Run(() => HandleClient(client));
+                }
+            }
+            catch (Exception) {
+                if (isStopping)
+                    return;
+                else throw;
             }
         }
 
@@ -130,7 +143,7 @@ namespace AirMouse_Host
         private void Execute(string json)
         {
             System.Diagnostics.Debug.WriteLine($"RAW: {json}"); //debug
-            
+
             var packet = JsonSerializer.Deserialize<InputPacket>(json);
 
             switch (packet?.Type)
@@ -179,6 +192,17 @@ namespace AirMouse_Host
             catch { }
 
             Disconnect();
+        }
+
+        public void Stop()
+        {
+            isStopping = true;
+            DisconnectFromHost("Server is shutting down");
+            try
+            {
+                server?.Stop();
+            }
+            catch { }
         }
     }
 }

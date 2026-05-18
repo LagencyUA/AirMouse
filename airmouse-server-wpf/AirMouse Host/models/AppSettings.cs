@@ -8,5 +8,6 @@ namespace AirMouse_Host.models
     {
         public bool UseStaticPin { get; set; } = false;
         public string StaticPin { get; set; } = "";
+        public int Port { get; set; } = 5000;
     }
 }
