@@ -34,13 +34,37 @@ class LayoutManager(private val context: Context) {
         }
     }
 
+    fun deleteLayout(name: String) {
+        val file = File(layoutsDir, "$name.json")
+        if (file.exists()) file.delete()
+    }
+
+    fun renameLayout(oldName: String, newName: String): Boolean {
+        val oldFile = File(layoutsDir, "$oldName.json")
+        val newFile = File(layoutsDir, "$newName.json")
+        if (oldFile.exists() && !newFile.exists()) {
+            val layout = loadLayout(oldName) ?: return false
+            val updatedLayout = layout.copy(name = newName)
+            saveLayout(updatedLayout)
+            oldFile.delete()
+            return true
+        }
+        return false
+    }
+
     fun getAllLayoutNames(): List<String> {
-        return layoutsDir.listFiles()?.map { it.nameWithoutExtension } ?: emptyList()
+        return layoutsDir.listFiles()?.map { it.nameWithoutExtension }?.sorted() ?: emptyList()
+    }
+
+    fun restoreDefaults() {
+        layoutsDir.listFiles()?.forEach { it.delete() }
+        createDefaultTestLayout()
+        // Add more default layouts here if needed
     }
 
     fun createDefaultTestLayout() {
         val testLayout = LayoutData(
-            name = "Test Layout",
+            name = "Default Layout",
             gridWidth = 12,
             gridHeight = 20,
             controls = listOf(
@@ -49,24 +73,29 @@ class LayoutManager(private val context: Context) {
                     name = "Enter",
                     x = 0, y = 0, width = 4, height = 2,
                     action = "key_press",
-                    payload = KeyPayload(Key = "Enter")
+                    payload = KeyPayload(Key = "Enter"),
+                    zIndex = 0
                 ),
                 ControlElement(
                     id = "btn_scroll_down",
                     name = "Scroll Down",
                     x = 4, y = 5, width = 4, height = 4,
                     action = "mouse_scroll",
-                    payload = MousePayload(Scroll = -15)
+                    payload = MousePayload(Scroll = -15),
+                    zIndex = 1
                 ),
                 ControlElement(
                     id = "btn_rmb",
                     name = "RMB",
                     x = 8, y = 0, width = 4, height = 2,
                     action = "mouse_button",
-                    payload = MousePayload(Button = "right", State = "down")
+                    payload = MousePayload(Button = "right", State = "down"),
+                    zIndex = 2
                 )
             )
         )
         saveLayout(testLayout)
+        // Clean up old "Test Layout.json" if it exists to avoid confusion
+        File(layoutsDir, "Test Layout.json").delete()
     }
 }

@@ -10,10 +10,11 @@ data class LayoutData(
 data class ControlElement(
     val id: String,
     val name: String,
-    val x: Int, // Grid position X
-    val y: Int, // Grid position Y
-    val width: Int, // Span columns
-    val height: Int, // Span rows
+    var x: Int, // Grid position X
+    var y: Int, // Grid position Y
+    var width: Int, // Span columns
+    var height: Int, // Span rows
     val action: String, // "key_press", "mouse_button", "mouse_scroll", etc.
-    val payload: Any? = null
+    val payload: Any? = null,
+    var zIndex: Int = 0
 )

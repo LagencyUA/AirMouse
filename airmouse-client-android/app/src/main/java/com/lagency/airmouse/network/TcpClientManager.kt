@@ -15,7 +15,7 @@ class TcpClientManager {
     private var input: BufferedReader? = null
     private val gson = Gson()
 
-    suspend fun connect(ip: String, port: Int = 8888): Boolean = withContext(Dispatchers.IO) {
+    suspend fun connect(ip: String, port: Int = 5000): Boolean = withContext(Dispatchers.IO) {
         try {
             socket = Socket()
             socket?.connect(InetSocketAddress(ip, port), 5000)

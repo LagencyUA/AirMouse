@@ -42,6 +42,63 @@
                 android:paddingEnd="8dp" />
         </HorizontalScrollView>
 
+        <!-- Edit Mode Tools -->
+        <LinearLayout
+            android:id="@+id/editToolsContainer"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageButton
+                android:id="@+id/btnRenameLayout"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Rename Layout"
+                android:src="@drawable/ic_rename" />
+
+            <ImageButton
+                android:id="@+id/btnAddElement"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Add Element"
+                android:src="@drawable/ic_add_box" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <ImageButton
+                android:id="@+id/btnDeleteLayout"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Delete Layout"
+                android:src="@drawable/ic_delete" />
+
+            <ImageButton
+                android:id="@+id/btnCancelEdit"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Cancel"
+                android:src="@drawable/ic_close" />
+
+            <ImageButton
+                android:id="@+id/btnSaveEdit"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Save"
+                android:src="@drawable/ic_check" />
+
+        </LinearLayout>
+
         <ImageButton
             android:id="@+id/btnEditLayout"
             android:layout_width="48dp"
