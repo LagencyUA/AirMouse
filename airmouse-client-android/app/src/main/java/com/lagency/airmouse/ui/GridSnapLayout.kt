@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.Button
 import com.lagency.airmouse.models.ControlElement
@@ -26,10 +27,8 @@ class GridSnapLayout @JvmOverloads constructor(
     var isEditMode: Boolean = false
         set(value) {
             field = value
+            if (!value) selectedChild = null
             invalidate()
-            for (i in 0 until childCount) {
-                getChildAt(i).invalidate()
-            }
         }
 
     private val gridPaint = Paint().apply {
@@ -52,11 +51,14 @@ class GridSnapLayout @JvmOverloads constructor(
     }
 
     private val handleSize = 12f * resources.displayMetrics.density
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private var selectedChild: View? = null
     private var dragHandle: DragHandle = DragHandle.NONE
     private var lastTouchX: Float = 0f
     private var lastTouchY: Float = 0f
+    private var startTouchX: Float = 0f
+    private var startTouchY: Float = 0f
     
     // For smooth dragging
     private var tempX: Float = 0f
@@ -64,12 +66,16 @@ class GridSnapLayout @JvmOverloads constructor(
     private var tempW: Float = 0f
     private var tempH: Float = 0f
 
+    var onSelectionChanged: ((ControlElement?) -> Unit)? = null
+
     enum class DragHandle { 
         NONE, TOP_LEFT, TOP_CENTER, TOP_RIGHT, 
         MIDDLE_LEFT, MIDDLE_RIGHT, 
         BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT, 
         BODY 
     }
+
+    fun getSelectedControl(): ControlElement? = selectedChild?.tag as? ControlElement
 
     fun setLayout(data: LayoutData, onControlClick: (ControlElement) -> Unit) {
         this.layoutData = data
@@ -79,6 +85,9 @@ class GridSnapLayout @JvmOverloads constructor(
             val button = Button(context).apply {
                 text = control.name
                 isAllCaps = false
+                alpha = 0.9f
+                elevation = (control.zIndex * 4f + 8f) * resources.displayMetrics.density
+                
                 setOnClickListener { 
                     if (!isEditMode) onControlClick(control) 
                 }
@@ -93,51 +102,48 @@ class GridSnapLayout @JvmOverloads constructor(
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         if (!isEditMode) return super.onInterceptTouchEvent(ev)
-        
-        if (ev.action == MotionEvent.ACTION_DOWN) {
-            lastTouchX = ev.x
-            lastTouchY = ev.y
-            
-            // First check if we hit a handle of the ALREADY selected child
-            selectedChild?.let { child ->
-                val handle = getHandleAt(child, ev.x, ev.y)
-                if (handle != DragHandle.NONE) {
-                    dragHandle = handle
-                    initTempVars(child)
-                    return true
-                }
-            }
-
-            // If not, find a new child
-            val child = findChildAt(ev.x, ev.y)
-            if (child != null) {
-                selectedChild = child
-                val handle = getHandleAt(child, ev.x, ev.y)
-                dragHandle = if (handle != DragHandle.NONE) handle else DragHandle.BODY
-                initTempVars(child)
-                invalidate()
-                return true
-            } else {
-                selectedChild = null
-                invalidate()
-            }
-        }
-        return false
-    }
-
-    private fun initTempVars(child: View) {
-        val control = child.tag as ControlElement
-        tempX = control.x.toFloat()
-        tempY = control.y.toFloat()
-        tempW = control.width.toFloat()
-        tempH = control.height.toFloat()
+        // Intercept everything in edit mode to handle selection/drag/resize
+        return true
     }
 
     override fun onTouchEvent(ev: MotionEvent): Boolean {
-        if (!isEditMode || selectedChild == null) return super.onTouchEvent(ev)
+        if (!isEditMode) return super.onTouchEvent(ev)
 
         when (ev.action) {
+            MotionEvent.ACTION_DOWN -> {
+                startTouchX = ev.x
+                startTouchY = ev.y
+                lastTouchX = ev.x
+                lastTouchY = ev.y
+                
+                // 1. Check if hit a handle of the already selected child
+                selectedChild?.let { child ->
+                    val handle = getHandleAt(child, ev.x, ev.y)
+                    if (handle != DragHandle.NONE) {
+                        dragHandle = handle
+                        initTempVars(child)
+                        return true
+                    }
+                }
+
+                // 2. If not a handle, check if hit any child (for move or selection)
+                val child = findChildAt(ev.x, ev.y)
+                if (child != null) {
+                    selectedChild = child
+                    dragHandle = DragHandle.BODY
+                    initTempVars(child)
+                    onSelectionChanged?.invoke(child.tag as ControlElement)
+                } else {
+                    selectedChild = null
+                    dragHandle = DragHandle.NONE
+                    onSelectionChanged?.invoke(null)
+                }
+                invalidate()
+                return true
+            }
             MotionEvent.ACTION_MOVE -> {
+                if (selectedChild == null || dragHandle == DragHandle.NONE) return false
+                
                 val dx = (ev.x - lastTouchX) / cellWidth
                 val dy = (ev.y - lastTouchY) / cellHeight
                 val control = selectedChild!!.tag as ControlElement
@@ -150,26 +156,19 @@ class GridSnapLayout @JvmOverloads constructor(
                         control.y = tempY.roundToInt().coerceIn(0, (layoutData?.gridHeight ?: 1) - control.height)
                     }
                     DragHandle.TOP_LEFT -> {
-                        tempX += dx
-                        tempY += dy
-                        tempW -= dx
-                        tempH -= dy
+                        tempX += dx; tempY += dy; tempW -= dx; tempH -= dy
                         applyResize(control)
                     }
                     DragHandle.TOP_CENTER -> {
-                        tempY += dy
-                        tempH -= dy
+                        tempY += dy; tempH -= dy
                         applyResize(control)
                     }
                     DragHandle.TOP_RIGHT -> {
-                        tempY += dy
-                        tempW += dx
-                        tempH -= dy
+                        tempY += dy; tempW += dx; tempH -= dy
                         applyResize(control)
                     }
                     DragHandle.MIDDLE_LEFT -> {
-                        tempX += dx
-                        tempW -= dx
+                        tempX += dx; tempW -= dx
                         applyResize(control)
                     }
                     DragHandle.MIDDLE_RIGHT -> {
@@ -177,9 +176,7 @@ class GridSnapLayout @JvmOverloads constructor(
                         applyResize(control)
                     }
                     DragHandle.BOTTOM_LEFT -> {
-                        tempX += dx
-                        tempW -= dx
-                        tempH += dy
+                        tempX += dx; tempW -= dx; tempH += dy
                         applyResize(control)
                     }
                     DragHandle.BOTTOM_CENTER -> {
@@ -187,8 +184,7 @@ class GridSnapLayout @JvmOverloads constructor(
                         applyResize(control)
                     }
                     DragHandle.BOTTOM_RIGHT -> {
-                        tempW += dx
-                        tempH += dy
+                        tempW += dx; tempH += dy
                         applyResize(control)
                     }
                     else -> {}
@@ -197,6 +193,7 @@ class GridSnapLayout @JvmOverloads constructor(
                 lastTouchX = ev.x
                 lastTouchY = ev.y
                 requestLayout()
+                return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 dragHandle = DragHandle.NONE
@@ -205,14 +202,20 @@ class GridSnapLayout @JvmOverloads constructor(
         return true
     }
 
+    private fun initTempVars(child: View) {
+        val control = child.tag as ControlElement
+        tempX = control.x.toFloat()
+        tempY = control.y.toFloat()
+        tempW = control.width.toFloat()
+        tempH = control.height.toFloat()
+    }
+
     private fun applyResize(control: ControlElement) {
-        // Snap to grid but keep temp values for smooth feel
         val newX = tempX.roundToInt().coerceAtLeast(0)
         val newY = tempY.roundToInt().coerceAtLeast(0)
         val newW = tempW.roundToInt().coerceAtLeast(1)
         val newH = tempH.roundToInt().coerceAtLeast(1)
         
-        // Additional constraints to prevent flipping
         if (newW >= 1) {
             control.x = newX
             control.width = newW
@@ -230,7 +233,6 @@ class GridSnapLayout @JvmOverloads constructor(
         val b = child.bottom.toFloat()
         val mw = (l + r) / 2
         val mh = (t + b) / 2
-        
         val h = handleSize
         
         return when {
@@ -261,9 +263,7 @@ class GridSnapLayout @JvmOverloads constructor(
     }
 
     override fun dispatchDraw(canvas: Canvas) {
-        if (isEditMode) {
-            drawGrid(canvas)
-        }
+        if (isEditMode) drawGrid(canvas)
         super.dispatchDraw(canvas)
         if (isEditMode) {
             selectedChild?.let { drawHandles(canvas, it) }
@@ -277,7 +277,6 @@ class GridSnapLayout @JvmOverloads constructor(
         val b = child.bottom.toFloat()
         val mw = (l + r) / 2
         val mh = (t + b) / 2
-        
         val radius = handleSize / 2
         
         canvas.drawCircle(l, t, radius, handlePaint)
@@ -293,7 +292,6 @@ class GridSnapLayout @JvmOverloads constructor(
     private fun drawGrid(canvas: Canvas) {
         val gridW = layoutData?.gridWidth ?: 1
         val gridH = layoutData?.gridHeight ?: 1
-        
         for (i in 0..gridW) {
             val x = i * cellWidth
             canvas.drawLine(x, 0f, x, height.toFloat(), gridPaint)
@@ -302,7 +300,6 @@ class GridSnapLayout @JvmOverloads constructor(
             val y = i * cellHeight
             canvas.drawLine(0f, y, width.toFloat(), y, gridPaint)
         }
-        
         for (i in 0..gridW) {
             for (j in 0..gridH) {
                 canvas.drawCircle(i * cellWidth, j * cellHeight, 3f, dotPaint)
@@ -313,47 +310,29 @@ class GridSnapLayout @JvmOverloads constructor(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
         val height = MeasureSpec.getSize(heightMeasureSpec)
-        
-        val paddingHorizontal = paddingLeft + paddingRight
-        val paddingVertical = paddingTop + paddingBottom
-        val availableWidth = width - paddingHorizontal
-        val availableHeight = height - paddingVertical
-
-        val gridW = layoutData?.gridWidth ?: 1
-        val gridH = layoutData?.gridHeight ?: 1
-        
-        cellWidth = availableWidth.toFloat() / gridW
-        cellHeight = availableHeight.toFloat() / gridH
+        val availableWidth = width - (paddingLeft + paddingRight)
+        val availableHeight = height - (paddingTop + paddingBottom)
+        cellWidth = availableWidth.toFloat() / (layoutData?.gridWidth ?: 1)
+        cellHeight = availableHeight.toFloat() / (layoutData?.gridHeight ?: 1)
 
         for (i in 0 until childCount) {
             val child = getChildAt(i)
             val control = child.tag as? ControlElement ?: continue
-            
-            val childWidth = (control.width * cellWidth).toInt()
-            val childHeight = (control.height * cellHeight).toInt()
-            
             child.measure(
-                MeasureSpec.makeMeasureSpec(childWidth, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(childHeight, MeasureSpec.EXACTLY)
+                MeasureSpec.makeMeasureSpec((control.width * cellWidth).toInt(), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec((control.height * cellHeight).toInt(), MeasureSpec.EXACTLY)
             )
         }
         setMeasuredDimension(width, height)
     }
 
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
-        val paddingL = paddingLeft
-        val paddingT = paddingTop
-
         for (i in 0 until childCount) {
             val child = getChildAt(i)
             val control = child.tag as? ControlElement ?: continue
-            
-            val left = paddingL + (control.x * cellWidth).toInt()
-            val top = paddingT + (control.y * cellHeight).toInt()
-            val right = left + child.measuredWidth
-            val bottom = top + child.measuredHeight
-            
-            child.layout(left, top, right, bottom)
+            val left = paddingLeft + (control.x * cellWidth).toInt()
+            val top = paddingTop + (control.y * cellHeight).toInt()
+            child.layout(left, top, left + child.measuredWidth, top + child.measuredHeight)
         }
     }
 }

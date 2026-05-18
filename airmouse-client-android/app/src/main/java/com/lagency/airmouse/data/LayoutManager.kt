@@ -11,58 +11,80 @@ import java.io.File
 
 class LayoutManager(private val context: Context) {
     private val gson = Gson()
-    private val layoutsDir = File(context.filesDir, "layouts").apply { if (!exists()) mkdirs() }
+    private val storageFile = File(context.filesDir, "layouts_v2.json")
+    private var allLayouts: MutableList<LayoutData> = mutableListOf()
 
-    fun saveLayout(layout: LayoutData) {
-        val file = File(layoutsDir, "${layout.name}.json")
-        val json = gson.toJson(layout)
-        file.writeText(json)
+    init {
+        loadFromStorage()
     }
 
-    fun loadLayout(name: String): LayoutData? {
-        val file = File(layoutsDir, "$name.json")
-        if (!file.exists()) return null
-        
-        return try {
-            val json = file.readText()
-            // Note: Polymorphic payload handling might be needed if payload is Any
-            // For now, let's handle the specific payload types we know
-            gson.fromJson(json, LayoutData::class.java)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
+    private fun loadFromStorage() {
+        if (storageFile.exists()) {
+            try {
+                val json = storageFile.readText()
+                val type = object : TypeToken<List<LayoutData>>() {}.type
+                val loaded: List<LayoutData>? = gson.fromJson(json, type)
+                if (loaded != null) {
+                    allLayouts = loaded.toMutableList()
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
+    private fun saveToStorage() {
+        try {
+            val json = gson.toJson(allLayouts)
+            storageFile.writeText(json)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    fun saveLayout(layout: LayoutData) {
+        val index = allLayouts.indexOfFirst { it.name == layout.name }
+        if (index != -1) {
+            allLayouts[index] = layout
+        } else {
+            allLayouts.add(layout)
+        }
+        saveToStorage()
+    }
+
+    fun loadLayout(name: String): LayoutData? {
+        return allLayouts.find { it.name == name }
+    }
+
     fun deleteLayout(name: String) {
-        val file = File(layoutsDir, "$name.json")
-        if (file.exists()) file.delete()
+        allLayouts.removeAll { it.name == name }
+        saveToStorage()
     }
 
     fun renameLayout(oldName: String, newName: String): Boolean {
-        val oldFile = File(layoutsDir, "$oldName.json")
-        val newFile = File(layoutsDir, "$newName.json")
-        if (oldFile.exists() && !newFile.exists()) {
-            val layout = loadLayout(oldName) ?: return false
-            val updatedLayout = layout.copy(name = newName)
-            saveLayout(updatedLayout)
-            oldFile.delete()
+        if (allLayouts.any { it.name == newName }) return false
+        val index = allLayouts.indexOfFirst { it.name == oldName }
+        if (index != -1) {
+            val oldLayout = allLayouts[index]
+            allLayouts[index] = oldLayout.copy(name = newName)
+            saveToStorage()
             return true
         }
         return false
     }
 
     fun getAllLayoutNames(): List<String> {
-        return layoutsDir.listFiles()?.map { it.nameWithoutExtension }?.sorted() ?: emptyList()
+        return allLayouts.map { it.name }.sorted()
     }
 
     fun restoreDefaults() {
-        layoutsDir.listFiles()?.forEach { it.delete() }
+        allLayouts.clear()
         createDefaultTestLayout()
-        // Add more default layouts here if needed
     }
 
     fun createDefaultTestLayout() {
+        if (allLayouts.any { it.name == "Default Layout" }) return
+        
         val testLayout = LayoutData(
             name = "Default Layout",
             gridWidth = 12,
@@ -73,7 +95,7 @@ class LayoutManager(private val context: Context) {
                     name = "Enter",
                     x = 0, y = 0, width = 4, height = 2,
                     action = "key_press",
-                    payload = KeyPayload(Key = "Enter"),
+                    payload = gson.toJson(KeyPayload(Key = "Enter")),
                     zIndex = 0
                 ),
                 ControlElement(
@@ -81,7 +103,7 @@ class LayoutManager(private val context: Context) {
                     name = "Scroll Down",
                     x = 4, y = 5, width = 4, height = 4,
                     action = "mouse_scroll",
-                    payload = MousePayload(Scroll = -15),
+                    payload = gson.toJson(MousePayload(Scroll = -15)),
                     zIndex = 1
                 ),
                 ControlElement(
@@ -89,13 +111,12 @@ class LayoutManager(private val context: Context) {
                     name = "RMB",
                     x = 8, y = 0, width = 4, height = 2,
                     action = "mouse_button",
-                    payload = MousePayload(Button = "right", State = "down"),
+                    payload = gson.toJson(MousePayload(Button = "right", State = "down")),
                     zIndex = 2
                 )
             )
         )
-        saveLayout(testLayout)
-        // Clean up old "Test Layout.json" if it exists to avoid confusion
-        File(layoutsDir, "Test Layout.json").delete()
+        allLayouts.add(testLayout)
+        saveToStorage()
     }
 }

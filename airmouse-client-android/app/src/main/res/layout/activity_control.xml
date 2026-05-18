@@ -68,6 +68,16 @@
                 android:contentDescription="Add Element"
                 android:src="@drawable/ic_add_box" />
 
+            <ImageButton
+                android:id="@+id/btnEditElement"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Edit Element"
+                android:src="@drawable/ic_edit_element"
+                android:alpha="0.5"
+                android:enabled="false" />
+
             <View
                 android:layout_width="0dp"
                 android:layout_height="1dp"
@@ -135,5 +145,59 @@
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/header" />
+
+    <!-- Button Edit Panel (Hidden by default) -->
+    <LinearLayout
+        android:id="@+id/buttonEditPanel"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:background="?attr/colorSurfaceVariant"
+        android:elevation="16dp"
+        android:orientation="vertical"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintHeight_default="percent"
+        app:layout_constraintHeight_percent="0.33">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Edit Button"
+                android:textAppearance="@style/TextAppearance.Material3.TitleLarge" />
+
+            <ImageButton
+                android:id="@+id/btnCloseEditPanel"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="Hide"
+                android:src="@drawable/ic_visibility_off" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?attr/colorOutlineVariant" />
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="16dp">
+            <!-- Edit controls will be added here -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Button settings coming soon..."
+                android:alpha="0.5" />
+        </ScrollView>
+    </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
