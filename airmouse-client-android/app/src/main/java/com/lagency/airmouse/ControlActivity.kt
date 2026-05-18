@@ -1,14 +1,18 @@
 package com.lagency.airmouse
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.google.gson.Gson
+import com.lagency.airmouse.data.LayoutManager
 import com.lagency.airmouse.databinding.ActivityControlBinding
-import androidx.activity.OnBackPressedCallback
+import com.lagency.airmouse.models.ControlElement
 import com.lagency.airmouse.models.InputPacket
 import com.lagency.airmouse.models.KeyPayload
+import com.lagency.airmouse.models.LayoutData
 import com.lagency.airmouse.models.MousePayload
 import com.lagency.airmouse.models.SystemPacket
 import com.lagency.airmouse.network.ConnectionHolder
@@ -19,6 +23,7 @@ import kotlinx.coroutines.withContext
 
 class ControlActivity : AppCompatActivity() {
     private lateinit var binding: ActivityControlBinding
+    private lateinit var layoutManager: LayoutManager
     private val gson = Gson()
     private var listenJob: Job? = null
 
@@ -27,6 +32,7 @@ class ControlActivity : AppCompatActivity() {
         binding = ActivityControlBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        layoutManager = LayoutManager(this)
         val tcpClient = ConnectionHolder.tcpClientManager
 
         if (tcpClient == null || !tcpClient.isConnected()) {
@@ -35,41 +41,51 @@ class ControlActivity : AppCompatActivity() {
             return
         }
 
+        setupHeader()
+        startListening()
+        loadDefaultLayout()
+
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 disconnectAndExit()
             }
         })
+    }
 
-        startListening()
+    private fun setupHeader() {
+        // ... (previous setupHeader code)
+    }
 
-        binding.btnDisconnect.setOnClickListener {
-            disconnectAndExit()
+    private fun loadDefaultLayout() {
+        // Create test layout if no layouts exist
+        if (layoutManager.getAllLayoutNames().isEmpty()) {
+            layoutManager.createDefaultTestLayout()
         }
 
-        binding.btnMouseMove.setOnClickListener {
-            sendInput("mouse_move", MousePayload(DX = 10, DY = 10))
-        }
-
-        binding.btnMouseButton.setOnClickListener {
-            sendInput("mouse_button", MousePayload(Button = "left", State = "down"))
-            // Usually we'd want to send "up" shortly after or on release, but for test:
-            lifecycleScope.launch {
-                kotlinx.coroutines.delay(100)
-                sendInput("mouse_button", MousePayload(Button = "left", State = "up"))
+        val testLayout = layoutManager.loadLayout("Test Layout")
+        if (testLayout != null) {
+            binding.layoutWorkingArea.setLayout(testLayout) { control ->
+                handleControlClick(control)
             }
         }
+    }
 
-        binding.btnMouseScroll.setOnClickListener {
-            sendInput("mouse_scroll", MousePayload(Scroll = -1)) // Scroll down
-        }
+    private fun handleControlClick(control: ControlElement) {
+        val payload = control.payload ?: return
+        
+        sendInput(control.action, payload)
+        
+        // If it was a mouse_button "down", send "up" after delay for test
+        // When loading from JSON, payload might be a LinkedTreeMap
+        val mousePayload = if (payload is MousePayload) payload 
+                          else try { gson.fromJson(gson.toJson(payload), MousePayload::class.java) } catch(e: Exception) { null }
 
-        binding.btnKeyPress.setOnClickListener {
-            sendInput("key_press", KeyPayload(Key = "Enter"))
-        }
-
-        binding.btnKeyCombo.setOnClickListener {
-            sendInput("key_combo", KeyPayload(Keys = listOf("Ctrl", "C")))
+        if (control.action == "mouse_button" && mousePayload?.State == "down") {
+            lifecycleScope.launch {
+                kotlinx.coroutines.delay(100)
+                val upPayload = mousePayload.copy(State = "up")
+                sendInput(control.action, upPayload)
+            }
         }
     }
 
@@ -96,7 +112,6 @@ class ControlActivity : AppCompatActivity() {
                 }
 
                 if (line == null) {
-                    // Socket closed or error
                     runOnUiThread {
                         if (!isFinishing) {
                             Toast.makeText(this@ControlActivity, "Server connection lost", Toast.LENGTH_SHORT).show()
@@ -111,7 +126,8 @@ class ControlActivity : AppCompatActivity() {
                     if (basePacket["Type"] == "system" && basePacket["Action"] == "disconnect") {
                         val message = basePacket["Message"] as? String
                         runOnUiThread {
-                            Toast.makeText(this@ControlActivity, message, Toast.LENGTH_SHORT).show()
+                            val toastMsg = if (message == "host_shutdown") "Server closed connection" else "Disconnected"
+                            Toast.makeText(this@ControlActivity, toastMsg, Toast.LENGTH_SHORT).show()
                             finish()
                         }
                         break
@@ -140,7 +156,6 @@ class ControlActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         listenJob?.cancel()
-        // Ensure we disconnect if we haven't already
         val tcpClient = ConnectionHolder.tcpClientManager
         if (tcpClient != null && tcpClient.isConnected()) {
             lifecycleScope.launch {

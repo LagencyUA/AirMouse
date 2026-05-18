@@ -47,6 +47,17 @@ class ConnectActivity : AppCompatActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Update status if we returned from ControlActivity and connection is lost
+        val tcpClient = ConnectionHolder.tcpClientManager
+        if (tcpClient == null || !tcpClient.isConnected()) {
+            binding.statusText.text = "Status: Disconnected"
+        } else {
+            binding.statusText.text = "Status: Connected!"
+        }
+    }
+
     private fun connectToServer(ip: String, port: Int, pin: String) {
         lifecycleScope.launch {
             binding.connectButton.isEnabled = false

@@ -60,6 +60,16 @@ namespace AirMouse_Host.input
             map.Add("END", 0x23);
             map.Add("PAGEUP", 0x21);
             map.Add("PAGEDOWN", 0x22);
+
+            // media keys
+            map.Add("VOLUME_MUTE", 0xAD);
+            map.Add("VOLUME_DOWN", 0xAE);
+            map.Add("VOLUME_UP", 0xAF);
+            map.Add("MEDIA_NEXT_TRACK", 0xB0);
+            map.Add("MEDIA_PREV_TRACK", 0xB1);
+            map.Add("MEDIA_STOP", 0xB2);
+            map.Add("MEDIA_PLAY_PAUSE", 0xB3);
+
         }
 
         private void InitializeNumericKeys()
