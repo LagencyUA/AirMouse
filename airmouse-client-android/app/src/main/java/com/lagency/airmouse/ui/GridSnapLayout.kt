@@ -79,6 +79,11 @@ class GridSnapLayout @JvmOverloads constructor(
 
     fun setLayout(data: LayoutData, onControlClick: (ControlElement) -> Unit) {
         this.layoutData = data
+        refreshViews(onControlClick)
+    }
+
+    private fun refreshViews(onControlClick: (ControlElement) -> Unit) {
+        val data = layoutData ?: return
         removeAllViews()
         
         data.controls.sortedBy { it.zIndex }.forEach { control ->
@@ -96,6 +101,7 @@ class GridSnapLayout @JvmOverloads constructor(
             addView(button)
         }
         requestLayout()
+        invalidate()
     }
 
     fun getLayoutData(): LayoutData? = layoutData

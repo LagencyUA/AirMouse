@@ -15,10 +15,9 @@ import com.google.gson.Gson
 import com.lagency.airmouse.data.LayoutManager
 import com.lagency.airmouse.databinding.ActivityControlBinding
 import com.lagency.airmouse.models.ControlElement
-import com.lagency.airmouse.models.InputPacket
 import com.lagency.airmouse.models.LayoutData
-import com.lagency.airmouse.models.SystemPacket
 import com.lagency.airmouse.network.ConnectionHolder
+import com.lagency.airmouse.ui.ControlEditManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -29,6 +28,8 @@ import kotlinx.coroutines.withContext
 class ControlActivity : AppCompatActivity() {
     private lateinit var binding: ActivityControlBinding
     private lateinit var layoutManager: LayoutManager
+    private lateinit var editManager: ControlEditManager
+    private val networkService = ConnectionHolder.networkService
     private val gson = Gson()
     private var listenJob: Job? = null
     
@@ -42,17 +43,32 @@ class ControlActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         layoutManager = LayoutManager(this)
-        val tcpClient = ConnectionHolder.tcpClientManager
+        editManager = ControlEditManager(
+            binding = binding,
+            onDelete = { control ->
+                binding.layoutWorkingArea.getLayoutData()?.let { layout ->
+                    layout.controls.remove(control)
+                    switchLayout(layout.name)
+                }
+            },
+            onSave = { 
+                binding.layoutWorkingArea.getLayoutData()?.let { layout ->
+                    // Re-sort controls in the data to match z-index
+                    layout.controls.sortBy { it.zIndex }
+                    switchLayout(layout.name)
+                }
+            }
+        )
 
-        if (tcpClient == null || !tcpClient.isConnected()) {
+        if (!networkService.isConnected()) {
             Toast.makeText(this, "Not connected", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
 
         setupHeader()
-        setupEditPanel()
         setupLayoutWorkingArea()
+        setupEditPanel()
         startListening()
         
         if (layoutManager.getAllLayoutNames().isEmpty()) {
@@ -74,36 +90,50 @@ class ControlActivity : AppCompatActivity() {
             val hasSelection = control != null
             binding.btnEditElement.isEnabled = hasSelection
             binding.btnEditElement.alpha = if (hasSelection) 1.0f else 0.5f
-            if (!hasSelection) binding.buttonEditPanel.visibility = View.GONE
+            if (!hasSelection) editManager.hidePanel()
         }
     }
 
     private fun setupHeader() {
-        binding.btnBack.setOnClickListener { disconnectAndExit() }
+        binding.btnBack.setOnClickListener { 
+            if (isEditMode) showCancelEditDialog() else disconnectAndExit()
+        }
         binding.btnSettings.setOnClickListener { startActivity(Intent(this, SettingsActivity::class.java)) }
         binding.btnEditLayout.setOnClickListener { setEditMode(!isEditMode) }
         binding.btnAddLayout.setOnClickListener { showAddLayoutDialog() }
 
         binding.btnRenameLayout.setOnClickListener { showRenameLayoutDialog() }
-        binding.btnAddElement.setOnClickListener { Toast.makeText(this, "Add block coming soon", Toast.LENGTH_SHORT).show() }
-        binding.btnEditElement.setOnClickListener {
-            binding.layoutWorkingArea.getSelectedControl()?.let { showButtonEditPanel(it) }
+        binding.btnAddElement.setOnClickListener { 
+            binding.layoutWorkingArea.getLayoutData()?.let { layout ->
+                val newControl = ControlElement(
+                    id = "btn_${System.currentTimeMillis()}",
+                    name = "New Btn",
+                    x = 0, y = 0, width = 2, height = 2,
+                    action = "key_press",
+                    payload = gson.toJson(mapOf("Key" to "A"))
+                )
+                layout.controls.add(newControl)
+                switchLayout(layout.name)
+            }
         }
+        
+        binding.btnEditElement.setOnClickListener {
+            binding.layoutWorkingArea.getSelectedControl()?.let { editManager.showPanel(it) }
+        }
+
         binding.btnDeleteLayout.setOnClickListener { showDeleteLayoutDialog() }
         binding.btnCancelEdit.setOnClickListener { showCancelEditDialog() }
         binding.btnSaveEdit.setOnClickListener { showSaveEditDialog() }
     }
 
     private fun setupEditPanel() {
-        binding.btnCloseEditPanel.setOnClickListener {
-            binding.buttonEditPanel.visibility = View.GONE
-        }
+        binding.btnCloseEditPanel.setOnClickListener { editManager.hidePanel() }
     }
 
     private fun setEditMode(enabled: Boolean) {
         isEditMode = enabled
         binding.layoutWorkingArea.isEditMode = enabled
-        if (!enabled) binding.buttonEditPanel.visibility = View.GONE
+        if (!enabled) editManager.hidePanel()
         
         binding.btnBack.visibility = if (enabled) View.GONE else View.VISIBLE
         binding.layoutsScrollView.visibility = if (enabled) View.GONE else View.VISIBLE
@@ -111,11 +141,8 @@ class ControlActivity : AppCompatActivity() {
         binding.btnSettings.visibility = if (enabled) View.GONE else View.VISIBLE
         binding.editToolsContainer.visibility = if (enabled) View.VISIBLE else View.GONE
         
-        if (enabled) {
-            binding.btnEditLayout.setColorFilter(getColor(android.R.color.holo_blue_light))
-        } else {
-            binding.btnEditLayout.clearColorFilter()
-        }
+        binding.btnEditLayout.setColorFilter(if (enabled) getColor(android.R.color.holo_blue_light) else 0)
+        if (!enabled) binding.btnEditLayout.clearColorFilter()
     }
 
     private fun refreshLayoutTabs() {
@@ -124,17 +151,9 @@ class ControlActivity : AppCompatActivity() {
             val btn = Button(this, null, androidx.appcompat.R.attr.buttonStyleSmall).apply {
                 text = name
                 isAllCaps = false
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(8, 0, 8, 0) }
-                
-                if (name == currentLayoutName) {
-                    alpha = 1.0f
-                    setBackgroundColor(getColor(android.R.color.holo_blue_light))
-                } else {
-                    alpha = 0.7f
-                }
+                layoutParams = LinearLayout.LayoutParams(-2, -2).apply { setMargins(8, 0, 8, 0) }
+                alpha = if (name == currentLayoutName) 1.0f else 0.7f
+                if (name == currentLayoutName) setBackgroundColor(getColor(android.R.color.holo_blue_light))
                 setOnClickListener { switchLayout(name) }
             }
             binding.layoutsContainer.addView(btn)
@@ -144,115 +163,72 @@ class ControlActivity : AppCompatActivity() {
     private fun switchLayout(name: String) {
         currentLayoutName = name
         layoutManager.loadLayout(name)?.let { layout ->
-            binding.layoutWorkingArea.setLayout(
-                layout,
-                onControlClick = { handleControlClick(it) }
-            )
+            binding.layoutWorkingArea.setLayout(layout) { control ->
+                handleControlClick(control)
+            }
         }
         refreshLayoutTabs()
     }
 
-    private fun showButtonEditPanel(control: ControlElement) {
-        binding.buttonEditPanel.visibility = View.VISIBLE
-        // Future: populate panel with control data
-    }
-
     private fun handleControlClick(control: ControlElement) {
-        sendInput(control.action, control.payload)
-        
-        if (control.action == "mouse_button" && control.payload.contains("\"State\":\"down\"")) {
-            lifecycleScope.launch {
+        lifecycleScope.launch {
+            networkService.sendInput(control.action, control.payload)
+            if (control.action == "mouse_button" && control.payload.contains("\"State\":\"down\"")) {
                 delay(100)
                 val upPayload = control.payload.replace("\"State\":\"down\"", "\"State\":\"up\"")
-                sendInput(control.action, upPayload)
-            }
-        }
-    }
-
-    private fun sendInput(action: String, payloadJson: String) {
-        val tcpClient = ConnectionHolder.tcpClientManager ?: return
-        lifecycleScope.launch(Dispatchers.IO) {
-            val packet = InputPacket(Action = action, Payload = payloadJson)
-            val sent = tcpClient.send(packet)
-            if (!sent) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(this@ControlActivity, "Failed to send $action", Toast.LENGTH_SHORT).show()
-                }
+                networkService.sendInput(control.action, upPayload)
             }
         }
     }
 
     private fun startListening() {
-        val tcpClient = ConnectionHolder.tcpClientManager ?: return
-        listenJob = lifecycleScope.launch(Dispatchers.IO) {
-            while (tcpClient.isConnected()) {
-                val line = try { tcpClient.read() } catch (e: Exception) { null }
-
-                if (line == null) {
-                    withContext(Dispatchers.Main) {
-                        if (!isFinishing) {
-                            Toast.makeText(this@ControlActivity, "Server connection lost", Toast.LENGTH_SHORT).show()
-                            finish()
-                        }
-                    }
-                    break
-                }
-
+        listenJob = lifecycleScope.launch {
+            networkService.messages.collect { line ->
                 try {
                     val basePacket = gson.fromJson(line, Map::class.java)
                     if (basePacket["Type"] == "system" && basePacket["Action"] == "disconnect") {
                         val message = basePacket["Message"] as? String
-                        withContext(Dispatchers.Main) {
-                            val toastMsg = if (message == "host_shutdown") "Server closed connection" else "Disconnected"
-                            Toast.makeText(this@ControlActivity, toastMsg, Toast.LENGTH_SHORT).show()
-                            finish()
-                        }
-                        break
+                        val toastMsg = if (message == "host_shutdown") "Server closed connection" else "Disconnected"
+                        Toast.makeText(this@ControlActivity, toastMsg, Toast.LENGTH_SHORT).show()
+                        finish()
                     }
-                } catch (e: Exception) { e.printStackTrace() }
+                } catch (e: Exception) { }
             }
         }
+        lifecycleScope.launch { networkService.startListening() }
     }
 
     private fun showRenameLayoutDialog() {
         val oldName = currentLayoutName ?: return
-        val input = EditText(this).apply {
-            setText(oldName)
-            selectAll()
-        }
+        val input = EditText(this).apply { setText(oldName); selectAll() }
         activeDialog = AlertDialog.Builder(this)
             .setTitle("Rename Layout")
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
                 val newName = input.text.toString().trim()
-                if (newName.isNotEmpty() && newName != oldName) {
-                    if (layoutManager.renameLayout(oldName, newName)) {
-                        currentLayoutName = newName
-                        refreshLayoutTabs()
-                    }
+                if (newName.isNotEmpty() && layoutManager.renameLayout(oldName, newName)) {
+                    currentLayoutName = newName
+                    refreshLayoutTabs()
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            .setNegativeButton("Cancel", null).show()
     }
 
     private fun showDeleteLayoutDialog() {
         val name = currentLayoutName ?: return
         activeDialog = AlertDialog.Builder(this)
             .setTitle("Delete Layout")
-            .setMessage("Are you sure you want to delete '$name'?")
+            .setMessage("Delete '$name'?")
             .setPositiveButton("Delete") { _, _ ->
                 layoutManager.deleteLayout(name)
-                currentLayoutName = layoutManager.getAllLayoutNames().firstOrNull()
-                if (currentLayoutName != null) switchLayout(currentLayoutName!!)
-                else {
+                val first = layoutManager.getAllLayoutNames().firstOrNull()
+                if (first != null) switchLayout(first) else {
                     layoutManager.createDefaultTestLayout()
                     switchLayout("Default Layout")
                 }
                 setEditMode(false)
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            .setNegativeButton("Cancel", null).show()
     }
 
     private fun showCancelEditDialog() {
@@ -263,8 +239,7 @@ class ControlActivity : AppCompatActivity() {
                 currentLayoutName?.let { switchLayout(it) }
                 setEditMode(false)
             }
-            .setNegativeButton("No", null)
-            .show()
+            .setNegativeButton("No", null).show()
     }
 
     private fun showSaveEditDialog() {
@@ -275,8 +250,7 @@ class ControlActivity : AppCompatActivity() {
                 binding.layoutWorkingArea.getLayoutData()?.let { layoutManager.saveLayout(it) }
                 setEditMode(false)
             }
-            .setNegativeButton("No", null)
-            .show()
+            .setNegativeButton("No", null).show()
     }
 
     private fun showAddLayoutDialog() {
@@ -291,19 +265,15 @@ class ControlActivity : AppCompatActivity() {
                     switchLayout(name)
                 }
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            .setNegativeButton("Cancel", null).show()
     }
 
     private fun disconnectAndExit() {
-        val tcpClient = ConnectionHolder.tcpClientManager
-        lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch {
             withContext(NonCancellable) {
-                if (tcpClient != null && tcpClient.isConnected()) {
-                    tcpClient.send(SystemPacket(Action = "disconnect"))
-                    tcpClient.disconnect()
-                }
-                withContext(Dispatchers.Main) { finish() }
+                networkService.sendSystemAction("disconnect")
+                networkService.disconnect()
+                finish()
             }
         }
     }
@@ -311,12 +281,6 @@ class ControlActivity : AppCompatActivity() {
     override fun onDestroy() {
         listenJob?.cancel()
         activeDialog?.dismiss()
-        val tcpClient = ConnectionHolder.tcpClientManager
-        if (tcpClient != null && tcpClient.isConnected()) {
-            lifecycleScope.launch(Dispatchers.IO) {
-                withContext(NonCancellable) { tcpClient.disconnect() }
-            }
-        }
         super.onDestroy()
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.lagency.airmouse.models.ControlElement
+import com.lagency.airmouse.models.ControlType
 import com.lagency.airmouse.models.KeyPayload
 import com.lagency.airmouse.models.LayoutData
 import com.lagency.airmouse.models.MousePayload
@@ -89,11 +90,12 @@ class LayoutManager(private val context: Context) {
             name = "Default Layout",
             gridWidth = 12,
             gridHeight = 20,
-            controls = listOf(
+            controls = mutableListOf(
                 ControlElement(
                     id = "btn_enter",
                     name = "Enter",
                     x = 0, y = 0, width = 4, height = 2,
+                    type = ControlType.BUTTON,
                     action = "key_press",
                     payload = gson.toJson(KeyPayload(Key = "Enter")),
                     zIndex = 0
@@ -102,6 +104,7 @@ class LayoutManager(private val context: Context) {
                     id = "btn_scroll_down",
                     name = "Scroll Down",
                     x = 4, y = 5, width = 4, height = 4,
+                    type = ControlType.SCROLL_BAR,
                     action = "mouse_scroll",
                     payload = gson.toJson(MousePayload(Scroll = -15)),
                     zIndex = 1
@@ -110,6 +113,7 @@ class LayoutManager(private val context: Context) {
                     id = "btn_rmb",
                     name = "RMB",
                     x = 8, y = 0, width = 4, height = 2,
+                    type = ControlType.BUTTON,
                     action = "mouse_button",
                     payload = gson.toJson(MousePayload(Button = "right", State = "down")),
                     zIndex = 2
