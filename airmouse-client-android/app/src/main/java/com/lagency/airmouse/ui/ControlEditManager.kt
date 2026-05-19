@@ -173,8 +173,9 @@ class ControlEditManager(
                 // Future: handle other types (MOUSE_PAD, etc.)
                 control.action = when(control.type) {
                     ControlType.MOUSE_PAD -> "mouse_move"
-                    ControlType.KEYBOARD -> "system_keyboard"
-                    ControlType.ACCELEROMETER -> "system_accel"
+                    //ControlType.KEYBOARD -> "system_keyboard"
+                    //ControlType.ACCELEROMETER -> "system_accel"
+                    //Implement in the future
                     else -> ""
                 }
             }

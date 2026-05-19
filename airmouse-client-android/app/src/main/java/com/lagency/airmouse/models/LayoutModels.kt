@@ -3,8 +3,9 @@ package com.lagency.airmouse.models
 enum class ControlType {
     BUTTON,
     MOUSE_PAD,
-    KEYBOARD,
-    ACCELEROMETER
+//    KEYBOARD,
+//    ACCELEROMETER
+//Implement in the future
 }
 
 data class LayoutData(
