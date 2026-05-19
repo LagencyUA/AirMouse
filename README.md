@@ -7,8 +7,8 @@ An open-source client-server system that transforms an Android smartphone into a
 ---
 
 ## 🌍 Language / Мова
-*   [English Description](#english-project-overview)
-*   [Український опис](#український-опис-проєкту)
+*   [🇬🇧 English Description](#english-project-overview)
+*   [🇺🇦 Український опис](#український-опис-проєкту)
 
 ---
 
@@ -17,7 +17,7 @@ An open-source client-server system that transforms an Android smartphone into a
 ### 🚀 Architecture & Tech Stack
 The project is built using a **monorepository** approach and consists of two main solutions communicating via low-latency **TCP Sockets** with custom **JSON packet validation**:
 
-*   **Host (Server):** Windows desktop application built with **WPF (C# / .NET 8)**. It runs in the system tray, parses incoming JSON payloads, and emulates OS-level input events using native Windows API (`SendInput`).
+*   **Host (Server):** Windows desktop application built with **WPF (C# / .NET 10)**. It runs in the system tray, parses incoming JSON payloads, and emulates OS-level input events using native Windows API (`SendInput`).
 *   **Client (Android App):** Native Android application built with **Java/Kotlin (Android Studio)**. It features a fully dynamic UI engine for layout management and real-time touch gesture processing.
 
 ### ✨ Key Features
@@ -27,14 +27,27 @@ The project is built using a **monorepository** approach and consists of two mai
 *   **Rich Input Protocol:** Full support for three discrete button states (`down`, `up`, `click`) for both mouse and hardware keyboard keys, alongside dedicated **action modifiers**.
 *   **Media & Keyboard Controls:** Built-in system text input bridging and expanded host key dictionaries (Play/Pause, Volume, Shortcuts).
 
-### 🛠️ Local Setup Installation
-*Note: Binaries will be available in Release tab in the future. .*
+### 🛠️ Installation & Build Guide 
+> *Notice: Ready-to-use binaries (.exe for Windows and .apk for Android) are available under the [Releases](https://github.com/LagencyUA/AirMouse/releases) tab. You can download and run them instantly without manual compilation.*
+
 1.  **Clone the repository:**
 ```bash
     git clone https://github.com/your-username/AirMouse-Project.git
 ```
-2. **Run the Server:** Open `airmouse-server-wpf/` in Visual Studio, build the solution (`Ctrl+Shift+B`), and launch the server.
-3. **Run the Client:** Open `airmouse-client-android/` in Android Studio, let Gradle sync dependencies, and deploy the app to your Android device.
+
+2. **Build the Windows Host (Server):**
+* Open `airmouse-server-wpf/AirMouseHost.sln` in **Visual Studio**.
+* Change the build configuration from `Debug` to **`Release`** on the top panel.
+* Right-click the project -> **Publish** -> Select **Folder** target.
+* In Profile Settings, enable **Self-contained** deployment and check **Produce single file** to compile everything into a standalone `AirMouse Host.exe`.
+* Click **Publish** and locate your executable in the output folder.
+
+
+3. **Build the Android Client:**
+* Open `airmouse-client-android/` in **Android Studio**.
+* Let Gradle sync all dependencies.
+* Navigate to **Build** -> **Generate APK Bundles or APKs** -> **Generate APKs**.
+* Once finished, click *Locate* in the bottom-right popup to get your standalone `.apk` file.
 ---
 
 ## Український: Опис проєкту
@@ -55,13 +68,26 @@ The project is built using a **monorepository** approach and consists of two mai
 * **Клавіатура та Медіа-модуль:** Програмний виклик системної Android-клавіатури для введення тексту на ПК та підтримка гарячих мультимедійних клавіш.
 
 ### 🛠️ Розгортання та Запуск
+> *Примітка: Готові до використання білди (.exe для Windows та .apk для Android) уже доступні у вкладці [Releases](https://github.com/LagencyUA/AirMouse/releases). Ви можете завантажити та запустити їх миттєво без ручної компіляції коду.*
 
 1. **Склонуйте репозиторій:**
 ```bash
 git clone [https://github.com/your-username/AirMouse-Project.git
 ```
-2.  **Запуск Сервера:** Відкрийте папку `airmouse-server-wpf/` у Visual Studio, скомпілюйте проєкт (`Ctrl+Shift+B`) та запустіть сервер.
-3.  **Запуск Клієнта:** Відкрийте папку `airmouse-client-android/` в Android Studio, зачекайте завершення синхронізації Gradle та вставте додаток на ваш Android-пристрій.
+
+2. **Збірка хоста Windows (Сервер):**
+   * Відкрийте файл `airmouse-server-wpf/AirMouseHost.sln` у **Visual Studio**.
+   * Змініть конфігурацію збірки з `Debug` на **`Release`** на верхній панелі.
+   * Клікніть правою кнопкою миші на проєкт -> **Publish** -> Виберіть ціль **Folder** (Папка).
+   * У налаштуваннях профілю увімкніть **Self-contained** режим та поставте галочку **Produce single file**, щоб скомпілювати все в один автономний файл `AirMouse Host.exe`.
+   * Натисніть **Publish** та знайдіть готовий файл у вихідній папці.
+
+3. **Збірка клієнта Android:**
+   * Відкрийте папку `airmouse-client-android/` в **Android Studio**.
+   * Зачекайте завершення синхронізації інструменту Gradle.
+   * Перейдіть у меню **Build** -> **Generate APK Bundles or APKs** -> **Generate APKs**.
+   * Після завершення натисніть *Locate* у спливаючому вікні, щоб отримати готовий `.apk` файл для встановлення.
+
 ---
 
 ## 📜 License / Ліцензія
