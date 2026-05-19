@@ -18,10 +18,8 @@ import com.lagency.airmouse.models.ControlElement
 import com.lagency.airmouse.models.LayoutData
 import com.lagency.airmouse.network.ConnectionHolder
 import com.lagency.airmouse.ui.ControlEditManager
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -74,7 +72,7 @@ class ControlActivity : AppCompatActivity() {
         startListening()
         
         if (layoutManager.getAllLayoutNames().isEmpty()) {
-            layoutManager.createDefaultTestLayout()
+            layoutManager.createDefaultLayouts()
         }
         refreshLayoutTabs()
         
@@ -221,7 +219,7 @@ class ControlActivity : AppCompatActivity() {
                 layoutManager.deleteLayout(name)
                 val first = layoutManager.getAllLayoutNames().firstOrNull()
                 if (first != null) switchLayout(first) else {
-                    layoutManager.createDefaultTestLayout()
+                    layoutManager.createDefaultLayouts()
                     switchLayout("Default Layout")
                 }
                 setEditMode(false)

@@ -3,7 +3,6 @@ package com.lagency.airmouse.models
 enum class ControlType {
     BUTTON,
     MOUSE_PAD,
-    SCROLL_BAR,
     KEYBOARD,
     ACCELEROMETER
 }
@@ -26,5 +25,7 @@ data class ControlElement(
     var action: String = "",
     var payload: String = "", // raw JSON string
     var zIndex: Int = 0,
-    var isModifier: Boolean = false
+    var isModifier: Boolean = false,
+    var sensitivity: Float = 1.0f,
+    var scrollSensitivity: Float = 1.0f
 )

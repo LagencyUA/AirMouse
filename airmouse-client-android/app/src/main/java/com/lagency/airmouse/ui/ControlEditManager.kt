@@ -101,11 +101,34 @@ class ControlEditManager(
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                 val typeStr = binding.spinnerControlType.selectedItem as? String ?: return
                 val type = ControlType.valueOf(typeStr)
-                binding.containerModifierOption.visibility = if (type == ControlType.BUTTON) View.VISIBLE else View.GONE
+                updatePanelsVisibility(type)
                 updateModifierCheckboxState()
+                
+                if (type == ControlType.MOUSE_PAD) {
+                    binding.editControlName.setText("Mouse Pad")
+                }
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
+
+        // Sensitivity SeekBars
+        binding.seekSensitivity.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = 0.25f + (progress * 0.25f)
+                binding.txtSensitivity.text = "Movement Sensitivity: $value"
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+
+        binding.seekScrollSensitivity.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                val value = 0.25f + (progress * 0.25f)
+                binding.txtScrollSensitivity.text = "Scroll Sensitivity: $value"
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
 
         // Z-Index Controls
         binding.btnZIndexMinus.setOnClickListener {
@@ -125,6 +148,8 @@ class ControlEditManager(
             control.name = binding.editControlName.text.toString().trim()
             control.zIndex = binding.editZIndex.text.toString().toIntOrNull()?.coerceIn(0, 100) ?: 0
             control.isModifier = binding.checkIsModifier.isChecked
+            control.sensitivity = 0.25f + (binding.seekSensitivity.progress * 0.25f)
+            control.scrollSensitivity = 0.25f + (binding.seekScrollSensitivity.progress * 0.25f)
             
             if (control.type == ControlType.BUTTON) {
                 if (binding.checkCustomPayload.isChecked) {
@@ -148,7 +173,6 @@ class ControlEditManager(
                 // Future: handle other types (MOUSE_PAD, etc.)
                 control.action = when(control.type) {
                     ControlType.MOUSE_PAD -> "mouse_move"
-                    ControlType.SCROLL_BAR -> "mouse_scroll"
                     ControlType.KEYBOARD -> "system_keyboard"
                     ControlType.ACCELEROMETER -> "system_accel"
                     else -> ""
@@ -180,9 +204,24 @@ class ControlEditManager(
         binding.buttonEditPanel.visibility = View.VISIBLE
         
         binding.spinnerControlType.setSelection(controlTypes.indexOf(control.type.name))
-        binding.editControlName.setText(control.name)
+        
+        if (control.type == ControlType.MOUSE_PAD) {
+            binding.editControlName.setText("Mouse Pad")
+        } else {
+            binding.editControlName.setText(control.name)
+        }
+
         binding.editZIndex.setText(control.zIndex.toString())
-        binding.containerModifierOption.visibility = if (control.type == ControlType.BUTTON) View.VISIBLE else View.GONE
+        
+        val sensProgress = ((control.sensitivity - 0.25f) / 0.25f).toInt().coerceIn(0, 7)
+        binding.seekSensitivity.progress = sensProgress
+        binding.txtSensitivity.text = "Movement Sensitivity: ${0.25f + sensProgress * 0.25f}"
+
+        val scrollProgress = ((control.scrollSensitivity - 0.25f) / 0.25f).toInt().coerceIn(0, 7)
+        binding.seekScrollSensitivity.progress = scrollProgress
+        binding.txtScrollSensitivity.text = "Scroll Sensitivity: ${0.25f + scrollProgress * 0.25f}"
+
+        updatePanelsVisibility(control.type)
         
         if (control.type == ControlType.BUTTON) {
             try {
@@ -217,6 +256,35 @@ class ControlEditManager(
     fun hidePanel() {
         binding.buttonEditPanel.visibility = View.GONE
         currentControl = null
+    }
+
+    private fun updatePanelsVisibility(type: ControlType) {
+        val isButton = type == ControlType.BUTTON
+        val isMousePad = type == ControlType.MOUSE_PAD
+        
+        binding.editControlName.visibility = if (isMousePad) View.GONE else View.VISIBLE
+        // Label for name
+        val nameLabel = binding.editControlName.parent.let { it as? android.view.ViewGroup }?.getChildAt(
+            (binding.editControlName.parent as android.view.ViewGroup).indexOfChild(binding.editControlName) - 1
+        )
+        nameLabel?.visibility = if (isMousePad) View.GONE else View.VISIBLE
+
+        binding.containerModifierOption.visibility = if (isButton) View.VISIBLE else View.GONE
+        
+        val predefinedLabel = binding.spinnerPredefinedKeys.parent.let { it as? android.view.ViewGroup }?.getChildAt(
+            (binding.spinnerPredefinedKeys.parent as android.view.ViewGroup).indexOfChild(binding.spinnerPredefinedKeys) - 1
+        )
+        predefinedLabel?.visibility = if (isButton) View.VISIBLE else View.GONE
+        binding.spinnerPredefinedKeys.visibility = if (isButton) View.VISIBLE else View.GONE
+        
+        binding.checkCustomPayload.parent.let { it as? android.view.View }?.visibility = if (isButton) View.VISIBLE else View.GONE
+        binding.editCustomPayload.visibility = if (isButton) View.VISIBLE else View.GONE
+        val customPayloadLabel = binding.editCustomPayload.parent.let { it as? android.view.ViewGroup }?.getChildAt(
+            (binding.editCustomPayload.parent as android.view.ViewGroup).indexOfChild(binding.editCustomPayload) - 1
+        )
+        customPayloadLabel?.visibility = if (isButton) View.VISIBLE else View.GONE
+
+        binding.containerMousePadSettings.visibility = if (isMousePad) View.VISIBLE else View.GONE
     }
 
     private fun updateModifierCheckboxState() {

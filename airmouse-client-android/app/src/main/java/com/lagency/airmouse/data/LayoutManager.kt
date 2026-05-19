@@ -80,47 +80,66 @@ class LayoutManager(private val context: Context) {
 
     fun restoreDefaults() {
         allLayouts.clear()
-        createDefaultTestLayout()
+        createDefaultLayouts()
     }
 
-    fun createDefaultTestLayout() {
-        if (allLayouts.any { it.name == "Default Layout" }) return
+    fun createDefaultLayouts() {
+        if (allLayouts.any { it.name == "Mouse" }) return
         
-        val testLayout = LayoutData(
-            name = "Default Layout",
+        val mouseLayout = LayoutData(
+            name = "Mouse",
             gridWidth = 12,
             gridHeight = 20,
             controls = mutableListOf(
                 ControlElement(
-                    id = "btn_enter",
-                    name = "Enter",
-                    x = 0, y = 0, width = 4, height = 2,
-                    type = ControlType.BUTTON,
-                    action = "key_press",
-                    payload = gson.toJson(KeyPayload(Key = "Enter")),
-                    zIndex = 0
+                    id = "mouse_pad",
+                    name = "Mouse Pad",
+                    x = 0, y = 0, width = 12, height = 16,
+                    type = ControlType.MOUSE_PAD
                 ),
                 ControlElement(
-                    id = "btn_scroll_down",
-                    name = "Scroll Down",
-                    x = 4, y = 5, width = 4, height = 4,
-                    type = ControlType.SCROLL_BAR,
-                    action = "mouse_scroll",
-                    payload = gson.toJson(MousePayload(Scroll = -15)),
-                    zIndex = 1
+                    id = "btn_mouse_x1",
+                    name = "X1",
+                    x = 0, y = 16, width = 2, height = 2,
+                    type = ControlType.BUTTON,
+                    action = "mouse_button",
+                    payload = gson.toJson(MousePayload(Button = "x1"))
+                ),
+                ControlElement(
+                    id = "btn_mouse_x2",
+                    name = "X2",
+                    x = 0, y = 18, width = 2, height = 2,
+                    type = ControlType.BUTTON,
+                    action = "mouse_button",
+                    payload = gson.toJson(MousePayload(Button = "x2"))
+                ),
+                ControlElement(
+                    id = "btn_lmb",
+                    name = "LMB",
+                    x = 2, y = 16, width = 4, height = 4,
+                    type = ControlType.BUTTON,
+                    action = "mouse_button",
+                    payload = gson.toJson(MousePayload(Button = "left"))
+                ),
+                ControlElement(
+                    id = "btn_mmb",
+                    name = "MMB",
+                    x = 6, y = 16, width = 2, height = 4,
+                    type = ControlType.BUTTON,
+                    action = "mouse_button",
+                    payload = gson.toJson(MousePayload(Button = "middle"))
                 ),
                 ControlElement(
                     id = "btn_rmb",
                     name = "RMB",
-                    x = 8, y = 0, width = 4, height = 2,
+                    x = 8, y = 16, width = 4, height = 4,
                     type = ControlType.BUTTON,
                     action = "mouse_button",
-                    payload = gson.toJson(MousePayload(Button = "right", State = "down")),
-                    zIndex = 2
+                    payload = gson.toJson(MousePayload(Button = "right"))
                 )
             )
         )
-        allLayouts.add(testLayout)
+        allLayouts.add(mouseLayout)
         saveToStorage()
     }
 }

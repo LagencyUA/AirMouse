@@ -11,6 +11,7 @@ import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.Button
 import com.lagency.airmouse.models.ControlElement
+import com.lagency.airmouse.models.ControlType
 import com.lagency.airmouse.models.LayoutData
 import kotlin.math.roundToInt
 
@@ -66,6 +67,9 @@ class GridSnapLayout @JvmOverloads constructor(
     private var tempW: Float = 0f
     private var tempH: Float = 0f
 
+    private val mousePadHandler by lazy { MousePadHandler { onControlClick -> onControlClickWrapper?.invoke(onControlClick) } }
+    private var onControlClickWrapper: ((ControlElement) -> Unit)? = null
+
     var onSelectionChanged: ((ControlElement?) -> Unit)? = null
 
     enum class DragHandle { 
@@ -80,6 +84,7 @@ class GridSnapLayout @JvmOverloads constructor(
     fun setLayout(data: LayoutData, onControlClick: (ControlElement) -> Unit) {
         val prevSelectedId = (selectedChild?.tag as? ControlElement)?.id
         this.layoutData = data
+        this.onControlClickWrapper = onControlClick
         refreshViews(onControlClick)
         
         if (prevSelectedId != null) {
@@ -115,6 +120,10 @@ class GridSnapLayout @JvmOverloads constructor(
             getChildAt(i).isActivated = false
         }
     }
+
+    private var scrollAccumulator = 0f
+    private val scrollThreshold = 10f // Threshold for cumulative scroll
+    private val baseScrollFactor = 1.5f // General scroll multiplier
 
     private fun handleTouch(control: ControlElement, state: String, onControlClick: (ControlElement) -> Unit) {
         if (control.isModifier) {
@@ -181,6 +190,11 @@ class GridSnapLayout @JvmOverloads constructor(
                 
                 setOnTouchListener { v, event ->
                     if (isEditMode) return@setOnTouchListener false
+                    
+                    if (control.type == ControlType.MOUSE_PAD) {
+                        mousePadHandler.handleTouch(control, event)
+                        return@setOnTouchListener true
+                    }
                     
                     when (event.action) {
                         MotionEvent.ACTION_DOWN -> {
