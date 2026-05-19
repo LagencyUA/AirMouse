@@ -47,6 +47,7 @@ class ControlActivity : AppCompatActivity() {
             binding = binding,
             onDelete = { control ->
                 binding.layoutWorkingArea.getLayoutData()?.let { layout ->
+                    binding.layoutWorkingArea.clearSelection()
                     layout.controls.remove(control)
                     switchLayout(layout.name)
                 }
@@ -55,6 +56,7 @@ class ControlActivity : AppCompatActivity() {
                 binding.layoutWorkingArea.getLayoutData()?.let { layout ->
                     // Re-sort controls in the data to match z-index
                     layout.controls.sortBy { it.zIndex }
+                    layoutManager.saveLayout(layout) // Persist changes immediately
                     switchLayout(layout.name)
                 }
             }
@@ -163,6 +165,7 @@ class ControlActivity : AppCompatActivity() {
     private fun switchLayout(name: String) {
         currentLayoutName = name
         layoutManager.loadLayout(name)?.let { layout ->
+            binding.layoutWorkingArea.resetModifiers()
             binding.layoutWorkingArea.setLayout(layout) { control ->
                 handleControlClick(control)
             }
@@ -173,11 +176,6 @@ class ControlActivity : AppCompatActivity() {
     private fun handleControlClick(control: ControlElement) {
         lifecycleScope.launch {
             networkService.sendInput(control.action, control.payload)
-            if (control.action == "mouse_button" && control.payload.contains("\"State\":\"down\"")) {
-                delay(100)
-                val upPayload = control.payload.replace("\"State\":\"down\"", "\"State\":\"up\"")
-                networkService.sendInput(control.action, upPayload)
-            }
         }
     }
 

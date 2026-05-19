@@ -99,6 +99,24 @@ namespace AirMouse_Host.input
             Send(vk, true);
         }
 
+        public void PressDown(string key)
+        {
+            ushort vk = GetVkCode(key);
+            if (vk == 0)
+                return;
+
+            Send(vk, false);
+        }
+
+        public void Release(string key)
+        {
+            ushort vk = GetVkCode(key);
+            if (vk == 0)
+                return;
+
+            Send(vk, true);
+        }
+
         public void Combo(List<string> keys)
         {
             if (keys == null || keys.Count == 0)

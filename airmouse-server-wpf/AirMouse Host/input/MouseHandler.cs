@@ -15,46 +15,52 @@ namespace AirMouse_Host.input
 
         public void Click(string button, string state)
         {
-            uint flag = 0;
+            if (button == null)
+                return;
 
-            switch (button.ToLower())
+            string btn = button.ToLowerInvariant();
+            string st = (state ?? string.Empty).ToLowerInvariant();
+
+            // Helper to send down/up or click
+            void SendPair(uint downFlag, uint upFlag, uint data = 0)
+            {
+                if (st == "down")
+                {
+                    SendMouse(0, 0, data, downFlag);
+                }
+                else if (st == "up")
+                {
+                    SendMouse(0, 0, data, upFlag);
+                }
+                else // click or unknown -> perform click
+                {
+                    SendMouse(0, 0, data, downFlag);
+                    SendMouse(0, 0, data, upFlag);
+                }
+            }
+
+            switch (btn)
             {
                 case "left":
-                    flag = state == "down"
-                        ? NativeInput.MOUSEEVENTF_LEFTDOWN
-                        : NativeInput.MOUSEEVENTF_LEFTUP;
+                    SendPair(NativeInput.MOUSEEVENTF_LEFTDOWN, NativeInput.MOUSEEVENTF_LEFTUP);
                     break;
 
                 case "right":
-                    flag = state == "down"
-                        ? NativeInput.MOUSEEVENTF_RIGHTDOWN
-                        : NativeInput.MOUSEEVENTF_RIGHTUP;
+                    SendPair(NativeInput.MOUSEEVENTF_RIGHTDOWN, NativeInput.MOUSEEVENTF_RIGHTUP);
                     break;
 
                 case "middle":
-                    flag = state == "down"
-                        ? NativeInput.MOUSEEVENTF_MIDDLEDOWN
-                        : NativeInput.MOUSEEVENTF_MIDDLEUP;
+                    SendPair(NativeInput.MOUSEEVENTF_MIDDLEDOWN, NativeInput.MOUSEEVENTF_MIDDLEUP);
                     break;
 
                 case "x1":
-                    flag = state == "down"
-                        ? NativeInput.MOUSEEVENTF_XDOWN
-                        : NativeInput.MOUSEEVENTF_XUP;
-
-                    SendMouse(0, 0, NativeInput.XBUTTON1, flag);
-                    return;
+                    SendPair(NativeInput.MOUSEEVENTF_XDOWN, NativeInput.MOUSEEVENTF_XUP, NativeInput.XBUTTON1);
+                    break;
 
                 case "x2":
-                    flag = state == "down"
-                        ? NativeInput.MOUSEEVENTF_XDOWN
-                        : NativeInput.MOUSEEVENTF_XUP;
-
-                    SendMouse(0, 0, NativeInput.XBUTTON2, flag);
-                    return;
+                    SendPair(NativeInput.MOUSEEVENTF_XDOWN, NativeInput.MOUSEEVENTF_XUP, NativeInput.XBUTTON2);
+                    break;
             }
-
-            SendMouse(0, 0, 0, flag);
         }
 
         public void Scroll(int delta)

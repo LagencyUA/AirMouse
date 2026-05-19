@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- State for active modifier -->
+    <item android:state_activated="true">
+        <shape>
+            <solid android:color="#FF6200EE" /> <!-- Purple 500 -->
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+    <!-- State for regular button press -->
+    <item android:state_pressed="true">
+        <shape>
+            <solid android:color="#406200EE" /> <!-- Semi-transparent purple -->
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+    <!-- Default state -->
+    <item>
+        <shape>
+            <solid android:color="#20808080" /> <!-- Light gray -->
+            <stroke android:width="1dp" android:color="#40808080" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+</selector>

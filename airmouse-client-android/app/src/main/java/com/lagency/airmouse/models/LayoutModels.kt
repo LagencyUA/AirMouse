@@ -25,5 +25,6 @@ data class ControlElement(
     var type: ControlType = ControlType.BUTTON,
     var action: String = "",
     var payload: String = "", // raw JSON string
-    var zIndex: Int = 0
+    var zIndex: Int = 0,
+    var isModifier: Boolean = false
 )

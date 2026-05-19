@@ -78,13 +78,92 @@ class GridSnapLayout @JvmOverloads constructor(
     fun getSelectedControl(): ControlElement? = selectedChild?.tag as? ControlElement
 
     fun setLayout(data: LayoutData, onControlClick: (ControlElement) -> Unit) {
+        val prevSelectedId = (selectedChild?.tag as? ControlElement)?.id
         this.layoutData = data
         refreshViews(onControlClick)
+        
+        if (prevSelectedId != null) {
+            reselectById(prevSelectedId)
+        }
+    }
+
+    fun clearSelection() {
+        selectedChild = null
+        dragHandle = DragHandle.NONE
+        invalidate()
+        onSelectionChanged?.invoke(null)
+    }
+
+    private fun reselectById(id: String) {
+        for (i in 0 until childCount) {
+            val child = getChildAt(i)
+            val control = child.tag as? ControlElement
+            if (control?.id == id) {
+                selectedChild = child
+                initTempVars(child)
+                invalidate()
+                break
+            }
+        }
+    }
+
+    private val activeModifiers = mutableSetOf<ControlElement>()
+    
+    fun resetModifiers() {
+        activeModifiers.clear()
+        for (i in 0 until childCount) {
+            getChildAt(i).isActivated = false
+        }
+    }
+
+    private fun handleTouch(control: ControlElement, state: String, onControlClick: (ControlElement) -> Unit) {
+        if (control.isModifier) {
+            if (state == "down") {
+                if (activeModifiers.contains(control)) {
+                    activeModifiers.remove(control)
+                    findViewWithTag<View>(control)?.isActivated = false
+                } else {
+                    activeModifiers.add(control)
+                    findViewWithTag<View>(control)?.isActivated = true
+                }
+            }
+            return
+        }
+
+        // For non-modifiers, if it's a key_press and we have active modifiers
+        if (control.action == "key_press" && activeModifiers.isNotEmpty()) {
+            if (state == "down") {
+                // Send sequence: modifiers + this key
+                val payloadObj = com.google.gson.Gson().fromJson(control.payload, com.lagency.airmouse.models.KeyPayload::class.java)
+                val sequence = activeModifiers.mapNotNull { 
+                    com.google.gson.Gson().fromJson(it.payload, com.lagency.airmouse.models.KeyPayload::class.java).Key 
+                } + (payloadObj.Key ?: "")
+                
+                val newPayload = com.lagency.airmouse.models.KeyPayload(Keys = sequence, State = "press")
+                val tempControl = control.copy(action = "key_combo", payload = com.google.gson.Gson().toJson(newPayload))
+                onControlClick(tempControl)
+            }
+        } else {
+            // Normal handling with states
+            val newPayload = if (control.action == "key_press") {
+                val p = com.google.gson.Gson().fromJson(control.payload, com.lagency.airmouse.models.KeyPayload::class.java)
+                com.google.gson.Gson().toJson(p.copy(State = state))
+            } else if (control.action == "mouse_button") {
+                val p = com.google.gson.Gson().fromJson(control.payload, com.lagency.airmouse.models.MousePayload::class.java)
+                com.google.gson.Gson().toJson(p.copy(State = if (state == "down") "down" else "up"))
+            } else {
+                control.payload
+            }
+            
+            val tempControl = control.copy(payload = newPayload)
+            onControlClick(tempControl)
+        }
     }
 
     private fun refreshViews(onControlClick: (ControlElement) -> Unit) {
         val data = layoutData ?: return
         removeAllViews()
+        selectedChild = null
         
         data.controls.sortedBy { it.zIndex }.forEach { control ->
             val button = Button(context).apply {
@@ -93,9 +172,29 @@ class GridSnapLayout @JvmOverloads constructor(
                 alpha = 0.9f
                 elevation = (control.zIndex * 4f + 8f) * resources.displayMetrics.density
                 
+                // Set common background for all buttons
+                setBackgroundResource(com.lagency.airmouse.R.drawable.btn_modifier_selector)
+                
                 setOnClickListener { 
                     if (!isEditMode) onControlClick(control) 
                 }
+                
+                setOnTouchListener { v, event ->
+                    if (isEditMode) return@setOnTouchListener false
+                    
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            v.isPressed = true
+                            handleTouch(control, "down", onControlClick)
+                        }
+                        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                            v.isPressed = false
+                            handleTouch(control, "up", onControlClick)
+                        }
+                    }
+                    true
+                }
+
                 tag = control
             }
             addView(button)
@@ -199,6 +298,7 @@ class GridSnapLayout @JvmOverloads constructor(
                 lastTouchX = ev.x
                 lastTouchY = ev.y
                 requestLayout()
+                invalidate() // Force redraw of handles
                 return true
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {

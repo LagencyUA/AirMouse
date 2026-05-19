@@ -168,6 +168,43 @@ namespace AirMouse_Host.services
 
         private void HandleKey(string payload)
         {
+            try
+            {
+                using var doc = JsonDocument.Parse(payload);
+                var root = doc.RootElement;
+
+                string key = GetStringFromJson(root, "Key");
+                string state = GetStringFromJson(root, "State");
+
+                if (!string.IsNullOrEmpty(state))
+                {
+                    // Only handle state if a single key is provided
+                    if (!string.IsNullOrEmpty(key))
+                    {
+                        switch (state.ToLowerInvariant())
+                        {
+                            case "down":
+                                keyboard.PressDown(key);
+                                break;
+                            case "up":
+                                keyboard.Release(key);
+                                break;
+                            case "press":
+                                keyboard.Press(key);
+                                break;
+                            default:
+                                keyboard.Press(key);
+                                break;
+                        }
+                        return;
+                    }
+                }
+            }
+            catch
+            {
+                // fallback to simple behavior below
+            }
+
             var data = JsonSerializer.Deserialize<KeyPayload>(payload);
             keyboard.Press(data.Key);
         }
