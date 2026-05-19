@@ -31,7 +31,7 @@ The project is built using a **monorepository** approach and consists of two mai
 *Note: Binaries will be available in Release tab in the future. .*
 1.  **Clone the repository:**
 ```bash
-    git clone [https://github.com/your-username/AirMouse-Project.git](https://github.com/your-username/AirMouse-Project.git
+    git clone https://github.com/your-username/AirMouse-Project.git
 ```
 2. **Run the Server:** Open `airmouse-server-wpf/` in Visual Studio, build the solution (`Ctrl+Shift+B`), and launch the server.
 3. **Run the Client:** Open `airmouse-client-android/` in Android Studio, let Gradle sync dependencies, and deploy the app to your Android device.
@@ -58,7 +58,7 @@ The project is built using a **monorepository** approach and consists of two mai
 
 1. **Склонуйте репозиторій:**
 ```bash
-git clone [https://github.com/your-username/AirMouse-Project.git](https://github.com/your-username/AirMouse-Project.git)
+git clone [https://github.com/your-username/AirMouse-Project.git
 ```
 2.  **Запуск Сервера:** Відкрийте папку `airmouse-server-wpf/` у Visual Studio, скомпілюйте проєкт (`Ctrl+Shift+B`) та запустіть сервер.
 3.  **Запуск Клієнта:** Відкрийте папку `airmouse-client-android/` в Android Studio, зачекайте завершення синхронізації Gradle та вставте додаток на ваш Android-пристрій.
