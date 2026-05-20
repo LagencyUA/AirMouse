@@ -91,7 +91,13 @@ namespace AirMouse_Host.input
 
         public void Press(string key)
         {
-            if (!string.IsNullOrEmpty(key) && key.Length == 1)
+            var vk = GetVkCode(key);
+            if (vk != 0)
+            {
+                Send(vk, false);
+                Send(vk, true);
+            }
+            else if (!string.IsNullOrEmpty(key) && key.Length == 1)
             {
                 SendUnicodeChar(key[0], false);
                 SendUnicodeChar(key[0], true);
@@ -100,7 +106,12 @@ namespace AirMouse_Host.input
 
         public void PressDown(string key)
         {
-            if (!string.IsNullOrEmpty(key) && key.Length == 1)
+            var vk = GetVkCode(key);
+            if (vk != 0)
+            {
+                Send(vk, false);
+            }
+            else if (!string.IsNullOrEmpty(key) && key.Length == 1)
             {
                 SendUnicodeChar(key[0], false);
             }
@@ -108,7 +119,12 @@ namespace AirMouse_Host.input
 
         public void Release(string key)
         {
-            if (!string.IsNullOrEmpty(key) && key.Length == 1)
+            var vk = GetVkCode(key);
+            if (vk != 0)
+            {
+                Send(vk, true);
+            }
+            else if (!string.IsNullOrEmpty(key) && key.Length == 1)
             {
                 SendUnicodeChar(key[0], true);
             }
@@ -198,7 +214,7 @@ namespace AirMouse_Host.input
             return 0; // Unknown key
         }
 
-        private void SendUnicodeChar(char c, bool keyUp)
+        private void SendUnicodeChar(char c, bool keyUp) // Single char Unicide support
         {
             var input = new NativeInput.INPUT
             {
@@ -218,6 +234,28 @@ namespace AirMouse_Host.input
                 1,
                 new[] { input },
                 Marshal.SizeOf<NativeInput.INPUT>());
+        }
+
+
+        // For typing longer text with proper Unicode support
+        public void TypeText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return;
+
+            foreach (var rune in text.EnumerateRunes())
+            {
+                SendRune(rune);
+            }
+        }
+
+        private void SendRune(Rune rune)
+        {
+            foreach (char c in rune.ToString())
+            {
+                SendUnicodeChar(c, false);
+                SendUnicodeChar(c, true);
+            }
         }
     }
 }

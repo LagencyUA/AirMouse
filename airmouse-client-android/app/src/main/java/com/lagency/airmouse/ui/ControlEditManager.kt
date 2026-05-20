@@ -185,6 +185,7 @@ class ControlEditManager(
             } else {
                 control.action = when(control.type) {
                     ControlType.MOUSE_PAD -> "mouse_move"
+                    ControlType.KEYBOARD -> "keyboard_text"
                     else -> ""
                 }
             }
@@ -210,8 +211,8 @@ class ControlEditManager(
         if (isUpdatingPanel) return
         val typeStr = binding.spinnerControlType.selectedItem as? String ?: return
         val type = ControlType.valueOf(typeStr)
-        if (type == ControlType.MOUSE_PAD) {
-            binding.editControlName.hint = "Touchpad"
+        if (type == ControlType.MOUSE_PAD || type == ControlType.KEYBOARD) {
+            binding.editControlName.hint = if (type == ControlType.MOUSE_PAD) "Touchpad" else "Keyboard"
             return
         }
 
@@ -291,24 +292,36 @@ class ControlEditManager(
     private fun updatePanelsVisibility(type: ControlType) {
         val isButton = type == ControlType.BUTTON
         val isMousePad = type == ControlType.MOUSE_PAD
-        binding.editControlName.visibility = if (isMousePad) View.GONE else View.VISIBLE
+        val isKeyboard = type == ControlType.KEYBOARD
+
+        binding.editControlName.visibility = if (isMousePad || isKeyboard) View.GONE else View.VISIBLE
         val nameLabel = binding.editControlName.parent.let { it as? ViewGroup }?.getChildAt(
             (binding.editControlName.parent as ViewGroup).indexOfChild(binding.editControlName) - 1
         )
-        nameLabel?.visibility = if (isMousePad) View.GONE else View.VISIBLE
+        nameLabel?.visibility = if (isMousePad || isKeyboard) View.GONE else View.VISIBLE
+        
         binding.containerModifierOption.visibility = if (isButton) View.VISIBLE else View.GONE
+        
         val predefinedLabel = binding.spinnerPredefinedKeys.parent.let { it as? ViewGroup }?.getChildAt(
             (binding.spinnerPredefinedKeys.parent as ViewGroup).indexOfChild(binding.spinnerPredefinedKeys) - 1
         )
         predefinedLabel?.visibility = if (isButton) View.VISIBLE else View.GONE
         binding.spinnerPredefinedKeys.visibility = if (isButton) View.VISIBLE else View.GONE
+        
         binding.checkCustomPayload.parent.let { it as? View }?.visibility = if (isButton) View.VISIBLE else View.GONE
         binding.editCustomPayload.visibility = if (isButton) View.VISIBLE else View.GONE
         val customPayloadLabel = binding.editCustomPayload.parent.let { it as? ViewGroup }?.getChildAt(
             (binding.editCustomPayload.parent as ViewGroup).indexOfChild(binding.editCustomPayload) - 1
         )
         customPayloadLabel?.visibility = if (isButton) View.VISIBLE else View.GONE
+        
         binding.containerMousePadSettings.visibility = if (isMousePad) View.VISIBLE else View.GONE
+        
+        // Z-Index settings are now always visible for all types as requested
+        val zIndexContainer = binding.editZIndex.parent as? View
+        zIndexContainer?.visibility = View.VISIBLE
+        val zIndexLabel = zIndexContainer?.let { (it.parent as ViewGroup).getChildAt((it.parent as ViewGroup).indexOfChild(it) - 1) }
+        zIndexLabel?.visibility = View.VISIBLE
     }
 
     private fun updateModifierCheckboxState() {

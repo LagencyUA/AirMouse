@@ -12,6 +12,26 @@ class KeyHandler(
     private val gson = Gson()
     private val activeModifiers = mutableSetOf<ControlElement>()
 
+    companion object {
+        private val ALLOWED_FOR_MODIFIERS = (('a'..'z') + ('A'..'Z') + 
+            listOf(' ', ';', ':', '\'', '"', '[', ']', '{', '}', ',', '.', '<', '>', '/', '?', '\\', '|', '`', '~', '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '-', '_', '=', '+')
+        ).map { it.toString() }.toSet()
+
+        fun isModifierAllowedForKey(key: String): Boolean {
+            // Predefined keys like ENTER, TAB, etc. are usually allowed with modifiers
+            val isSpecialKey = key.length > 1 && !key.startsWith("MOUSE_")
+            return isSpecialKey || ALLOWED_FOR_MODIFIERS.contains(key)
+        }
+    }
+
+    fun getActiveModifierKeys(): List<String> {
+        return activeModifiers.mapNotNull {
+            try {
+                gson.fromJson(it.payload, KeyPayload::class.java).Key
+            } catch (e: Exception) { null }
+        }
+    }
+
     fun resetModifiers() {
         val modifiersToClear = activeModifiers.toList()
         activeModifiers.clear()
@@ -35,11 +55,16 @@ class KeyHandler(
         // For non-modifiers, if it's a key_press and we have active modifiers
         if (control.action == "key_press" && activeModifiers.isNotEmpty()) {
             if (state == "down") {
-                // Send sequence: modifiers + this key
                 val payloadObj = gson.fromJson(control.payload, KeyPayload::class.java)
-                val sequence = activeModifiers.mapNotNull {
-                    gson.fromJson(it.payload, KeyPayload::class.java).Key
-                } + (payloadObj.Key ?: "")
+                val key = payloadObj.Key ?: ""
+                
+                if (!isModifierAllowedForKey(key)) {
+                    // Ignore if modifiers are active but key is not allowed (e.g. emoji or non-latin if we strictly follow the user request)
+                    return
+                }
+
+                // Send sequence: modifiers + this key
+                val sequence = getActiveModifierKeys() + key
 
                 val newPayload = KeyPayload(Keys = sequence, State = "press")
                 val tempControl = control.copy(action = "key_combo", payload = gson.toJson(newPayload))

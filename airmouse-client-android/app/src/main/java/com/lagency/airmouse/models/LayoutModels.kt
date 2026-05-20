@@ -5,7 +5,7 @@ import com.google.gson.Gson
 enum class ControlType {
     BUTTON,
     MOUSE_PAD,
-//    KEYBOARD,
+    KEYBOARD,
 //    ACCELEROMETER
 //Implement in the future
 }
@@ -37,6 +37,7 @@ data class ControlElement(
         
         return when (type) {
             ControlType.MOUSE_PAD -> "Touchpad"
+            ControlType.KEYBOARD -> "Keyboard"
             ControlType.BUTTON -> {
                 when (action) {
                     "mouse_button" -> {

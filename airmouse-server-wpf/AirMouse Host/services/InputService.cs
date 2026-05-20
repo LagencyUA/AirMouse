@@ -32,6 +32,10 @@ namespace AirMouse_Host.services
                     HandleKey(packet.Payload);
                     break;
 
+                case "keyboard_text":
+                    HandleKeyboardText(packet.Payload);
+                    break;
+
                 case "key_combo":
                     HandleCombo(packet.Payload);
                     break;
@@ -213,6 +217,38 @@ namespace AirMouse_Host.services
         {
             var data = JsonSerializer.Deserialize<KeyPayload>(payload);
             keyboard.Combo(data.Keys);
+        }
+
+        private void HandleKeyboardText(string payload)
+        {
+            // Prefer direct deserialization into a dictionary to preserve whitespace exactly
+            try
+            {
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var obj = JsonSerializer.Deserialize<Dictionary<string, string>>(payload, opts);
+                if (obj != null && obj.TryGetValue("Text", out var text))
+                {
+                    keyboard.TypeText(text);
+                    return;
+                }
+            }
+            catch
+            {
+                // fall through to fallback
+            }
+
+            // Fallback: try parsing generically and extract Text preserving whitespace
+            try
+            {
+                using var doc = JsonDocument.Parse(payload);
+                if (doc.RootElement.TryGetProperty("Text", out var prop) && prop.ValueKind == JsonValueKind.String)
+                {
+                    var text = prop.GetString() ?? string.Empty;
+                    keyboard.TypeText(text);
+                    return;
+                }
+            }
+            catch { }
         }
     }
 }

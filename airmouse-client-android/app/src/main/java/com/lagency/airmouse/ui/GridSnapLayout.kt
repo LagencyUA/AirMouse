@@ -78,6 +78,20 @@ class GridSnapLayout @JvmOverloads constructor(
             }
         )
     }
+
+    private val keyboardHandler by lazy {
+        KeyboardHandler(
+            context = context,
+            getActiveModifiers = { keyHandler.getActiveModifierKeys() },
+            onSendPacket = { action, payload ->
+                onControlClickWrapper?.invoke(ControlElement(
+                    id = "kb_temp", name = "", x = 0, y = 0, width = 0, height = 0,
+                    action = action, payload = payload
+                ))
+            }
+        )
+    }
+
     private var onControlClickWrapper: ((ControlElement) -> Unit)? = null
 
     var onSelectionChanged: ((ControlElement?) -> Unit)? = null
@@ -87,6 +101,11 @@ class GridSnapLayout @JvmOverloads constructor(
         MIDDLE_LEFT, MIDDLE_RIGHT, 
         BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT, 
         BODY 
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        keyboardHandler.attachToView(this)
     }
 
     fun getSelectedControl(): ControlElement? = selectedChild?.tag as? ControlElement
@@ -131,6 +150,9 @@ class GridSnapLayout @JvmOverloads constructor(
         removeAllViews()
         selectedChild = null
         
+        // Re-attach keyboard handler's hidden field after clearing
+        keyboardHandler.attachToView(this)
+        
         data.controls.sortedBy { it.zIndex }.forEach { control ->
             val button = Button(context).apply {
                 text = control.getDisplayName(gson)
@@ -142,7 +164,13 @@ class GridSnapLayout @JvmOverloads constructor(
                 setBackgroundResource(com.lagency.airmouse.R.drawable.btn_modifier_selector)
                 
                 setOnClickListener { 
-                    if (!isEditMode) onControlClick(control) 
+                    if (!isEditMode) {
+                        if (control.type == ControlType.KEYBOARD) {
+                            keyboardHandler.showKeyboard()
+                        } else {
+                            onControlClick(control)
+                        }
+                    }
                 }
                 
                 setOnTouchListener { v, event ->
@@ -151,6 +179,10 @@ class GridSnapLayout @JvmOverloads constructor(
                     if (control.type == ControlType.MOUSE_PAD) {
                         mousePadHandler.handleTouch(control, event)
                         return@setOnTouchListener true
+                    }
+
+                    if (control.type == ControlType.KEYBOARD) {
+                        return@setOnTouchListener false
                     }
                     
                     when (event.action) {
@@ -204,7 +236,7 @@ class GridSnapLayout @JvmOverloads constructor(
 
                 // 2. If not a handle, check if hit any child (for move or selection)
                 val child = findChildAt(ev.x, ev.y)
-                if (child != null) {
+                if (child != null && child.tag is ControlElement) {
                     selectedChild = child
                     dragHandle = DragHandle.BODY
                     initTempVars(child)
@@ -332,6 +364,7 @@ class GridSnapLayout @JvmOverloads constructor(
     private fun findChildAt(x: Float, y: Float): View? {
         for (i in childCount - 1 downTo 0) {
             val child = getChildAt(i)
+            if (child.tag !is ControlElement) continue
             if (x >= child.left && x <= child.right && y >= child.top && y <= child.bottom) {
                 return child
             }
@@ -394,11 +427,16 @@ class GridSnapLayout @JvmOverloads constructor(
 
         for (i in 0 until childCount) {
             val child = getChildAt(i)
-            val control = child.tag as? ControlElement ?: continue
-            child.measure(
-                MeasureSpec.makeMeasureSpec((control.width * cellWidth).toInt(), MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec((control.height * cellHeight).toInt(), MeasureSpec.EXACTLY)
-            )
+            val control = child.tag as? ControlElement
+            if (control != null) {
+                child.measure(
+                    MeasureSpec.makeMeasureSpec((control.width * cellWidth).toInt(), MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec((control.height * cellHeight).toInt(), MeasureSpec.EXACTLY)
+                )
+            } else {
+                // Measure other views (like the hidden EditText)
+                child.measure(MeasureSpec.makeMeasureSpec(1, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(1, MeasureSpec.EXACTLY))
+            }
         }
         setMeasuredDimension(width, height)
     }
@@ -406,10 +444,15 @@ class GridSnapLayout @JvmOverloads constructor(
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         for (i in 0 until childCount) {
             val child = getChildAt(i)
-            val control = child.tag as? ControlElement ?: continue
-            val left = paddingLeft + (control.x * cellWidth).toInt()
-            val top = paddingTop + (control.y * cellHeight).toInt()
-            child.layout(left, top, left + child.measuredWidth, top + child.measuredHeight)
+            val control = child.tag as? ControlElement
+            if (control != null) {
+                val left = paddingLeft + (control.x * cellWidth).toInt()
+                val top = paddingTop + (control.y * cellHeight).toInt()
+                child.layout(left, top, left + child.measuredWidth, top + child.measuredHeight)
+            } else {
+                // Layout other views at (0,0) with 1x1 size
+                child.layout(0, 0, child.measuredWidth, child.measuredHeight)
+            }
         }
     }
 }
