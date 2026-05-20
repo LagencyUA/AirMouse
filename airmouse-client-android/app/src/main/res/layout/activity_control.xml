@@ -212,13 +212,13 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Display Name" />
+                    android:text="Custom Label (leave empty for auto)" />
 
                 <EditText
                     android:id="@+id/editControlName"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="Button label"
+                    android:hint="Auto-generated name"
                     android:inputType="text" />
 
                 <!-- Mouse Pad Settings -->

@@ -43,6 +43,22 @@
         app:layout_constraintTop_toBottomOf="@id/settingsHeader">
 
         <Button
+            android:id="@+id/btnExportLayouts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Export Layouts"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_marginBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnImportLayouts"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Import Layouts"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_marginBottom="16dp" />
+
+        <Button
             android:id="@+id/btnRestoreDefaults"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

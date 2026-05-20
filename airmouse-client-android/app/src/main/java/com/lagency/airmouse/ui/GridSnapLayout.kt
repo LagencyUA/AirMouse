@@ -10,6 +10,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.widget.Button
+import com.google.gson.Gson
 import com.lagency.airmouse.models.ControlElement
 import com.lagency.airmouse.models.ControlType
 import com.lagency.airmouse.models.LayoutData
@@ -21,6 +22,7 @@ class GridSnapLayout @JvmOverloads constructor(
     defStyleAttr: Int = 0
 ) : ViewGroup(context, attrs, defStyleAttr) {
 
+    private val gson = Gson()
     private var layoutData: LayoutData? = null
     private var cellWidth: Float = 0f
     private var cellHeight: Float = 0f
@@ -107,7 +109,7 @@ class GridSnapLayout @JvmOverloads constructor(
         onSelectionChanged?.invoke(null)
     }
 
-    private fun reselectById(id: String) {
+    fun reselectById(id: String) {
         for (i in 0 until childCount) {
             val child = getChildAt(i)
             val control = child.tag as? ControlElement
@@ -131,7 +133,7 @@ class GridSnapLayout @JvmOverloads constructor(
         
         data.controls.sortedBy { it.zIndex }.forEach { control ->
             val button = Button(context).apply {
-                text = control.name
+                text = control.getDisplayName(gson)
                 isAllCaps = false
                 alpha = 0.9f
                 elevation = (control.zIndex * 4f + 8f) * resources.displayMetrics.density

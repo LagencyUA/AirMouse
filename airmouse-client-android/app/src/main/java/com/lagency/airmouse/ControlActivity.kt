@@ -40,22 +40,22 @@ class ControlActivity : AppCompatActivity() {
         binding = ActivityControlBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        layoutManager = LayoutManager(this)
+        layoutManager = LayoutManager.getInstance(this)
         editManager = ControlEditManager(
             binding = binding,
             onDelete = { control ->
                 binding.layoutWorkingArea.getLayoutData()?.let { layout ->
                     binding.layoutWorkingArea.clearSelection()
                     layout.controls.remove(control)
-                    switchLayout(layout.name)
+                    // Just refresh the view, don't save to LayoutManager yet
+                    binding.layoutWorkingArea.setLayout(layout) { handleControlClick(it) }
                 }
             },
             onSave = { 
                 binding.layoutWorkingArea.getLayoutData()?.let { layout ->
-                    // Re-sort controls in the data to match z-index
                     layout.controls.sortBy { it.zIndex }
-                    layoutManager.saveLayout(layout) // Persist changes immediately
-                    switchLayout(layout.name)
+                    // Just refresh the view, don't save to LayoutManager yet
+                    binding.layoutWorkingArea.setLayout(layout) { handleControlClick(it) }
                 }
             }
         )
@@ -85,6 +85,18 @@ class ControlActivity : AppCompatActivity() {
         })
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (!isEditMode) {
+            val allNames = layoutManager.getAllLayoutNames()
+            if (currentLayoutName == null || !allNames.contains(currentLayoutName)) {
+                currentLayoutName = allNames.firstOrNull()
+            }
+            refreshLayoutTabs()
+            currentLayoutName?.let { switchLayout(it) }
+        }
+    }
+
     private fun setupLayoutWorkingArea() {
         binding.layoutWorkingArea.onSelectionChanged = { control ->
             val hasSelection = control != null
@@ -107,13 +119,14 @@ class ControlActivity : AppCompatActivity() {
             binding.layoutWorkingArea.getLayoutData()?.let { layout ->
                 val newControl = ControlElement(
                     id = "btn_${System.currentTimeMillis()}",
-                    name = "New Btn",
+                    name = "",
                     x = 0, y = 0, width = 2, height = 2,
                     action = "key_press",
                     payload = gson.toJson(mapOf("Key" to "A"))
                 )
                 layout.controls.add(newControl)
-                switchLayout(layout.name)
+                binding.layoutWorkingArea.setLayout(layout) { handleControlClick(it) }
+                binding.layoutWorkingArea.reselectById(newControl.id)
             }
         }
         
@@ -133,6 +146,11 @@ class ControlActivity : AppCompatActivity() {
     private fun setEditMode(enabled: Boolean) {
         isEditMode = enabled
         binding.layoutWorkingArea.isEditMode = enabled
+        
+        // Ensure we work on a fresh deep copy when entering edit mode,
+        // and discard any unsaved visual changes when exiting.
+        currentLayoutName?.let { switchLayout(it) }
+
         if (!enabled) editManager.hidePanel()
         
         binding.btnBack.visibility = if (enabled) View.GONE else View.VISIBLE
@@ -141,6 +159,8 @@ class ControlActivity : AppCompatActivity() {
         binding.btnSettings.visibility = if (enabled) View.GONE else View.VISIBLE
         binding.editToolsContainer.visibility = if (enabled) View.VISIBLE else View.GONE
         
+        binding.btnEditLayout.isEnabled = !enabled
+        binding.btnEditLayout.alpha = if (enabled) 0.5f else 1.0f
         binding.btnEditLayout.setColorFilter(if (enabled) getColor(android.R.color.holo_blue_light) else 0)
         if (!enabled) binding.btnEditLayout.clearColorFilter()
     }

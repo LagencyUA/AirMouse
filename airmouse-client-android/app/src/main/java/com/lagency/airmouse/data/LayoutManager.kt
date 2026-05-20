@@ -10,13 +10,27 @@ import com.lagency.airmouse.models.LayoutData
 import com.lagency.airmouse.models.MousePayload
 import java.io.File
 
-class LayoutManager(private val context: Context) {
+class LayoutManager private constructor(context: Context) {
     private val gson = Gson()
-    private val storageFile = File(context.filesDir, "layouts_v2.json")
+    private val storageFile = File(context.applicationContext.filesDir, "layouts_v2.json")
     private var allLayouts: MutableList<LayoutData> = mutableListOf()
+
+    companion object {
+        @Volatile
+        private var instance: LayoutManager? = null
+
+        fun getInstance(context: Context): LayoutManager {
+            return instance ?: synchronized(this) {
+                instance ?: LayoutManager(context).also { instance = it }
+            }
+        }
+    }
 
     init {
         loadFromStorage()
+        if (allLayouts.isEmpty()) {
+            createDefaultLayouts()
+        }
     }
 
     private fun loadFromStorage() {
@@ -44,17 +58,24 @@ class LayoutManager(private val context: Context) {
     }
 
     fun saveLayout(layout: LayoutData) {
-        val index = allLayouts.indexOfFirst { it.name == layout.name }
+        // Save a deep copy so the UI doesn't keep modifying the instance stored in the list
+        val json = gson.toJson(layout)
+        val copy = gson.fromJson(json, LayoutData::class.java)
+        
+        val index = allLayouts.indexOfFirst { it.name == copy.name }
         if (index != -1) {
-            allLayouts[index] = layout
+            allLayouts[index] = copy
         } else {
-            allLayouts.add(layout)
+            allLayouts.add(copy)
         }
         saveToStorage()
     }
 
     fun loadLayout(name: String): LayoutData? {
-        return allLayouts.find { it.name == name }
+        val original = allLayouts.find { it.name == name } ?: return null
+        // Return a deep copy so editing doesn't affect the master list until saved
+        val json = gson.toJson(original)
+        return gson.fromJson(json, LayoutData::class.java)
     }
 
     fun deleteLayout(name: String) {
@@ -76,6 +97,25 @@ class LayoutManager(private val context: Context) {
 
     fun getAllLayoutNames(): List<String> {
         return allLayouts.map { it.name }.sorted()
+    }
+
+    fun getExportJson(): String {
+        return gson.toJson(allLayouts)
+    }
+
+    fun importFromJson(json: String): Boolean {
+        return try {
+            val type = object : TypeToken<List<LayoutData>>() {}.type
+            val imported: List<LayoutData>? = gson.fromJson(json, type)
+            if (imported != null && imported.isNotEmpty()) {
+                allLayouts = imported.toMutableList()
+                saveToStorage()
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
     }
 
     fun restoreDefaults() {

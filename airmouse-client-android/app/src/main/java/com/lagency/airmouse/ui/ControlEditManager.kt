@@ -1,6 +1,7 @@
 package com.lagency.airmouse.ui
 
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import com.google.gson.Gson
 import com.lagency.airmouse.databinding.ActivityControlBinding
@@ -42,12 +43,10 @@ class ControlEditManager(
     }
 
     private fun setupListeners() {
-        // Control Type Spinner
         val typeAdapter = ArrayAdapter(binding.root.context, android.R.layout.simple_spinner_item, controlTypes)
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.spinnerControlType.adapter = typeAdapter
 
-        // Predefined Keys Spinner with Categories
         val keyAdapter = object : ArrayAdapter<String>(binding.root.context, android.R.layout.simple_spinner_item, predefinedKeys) {
             private var defaultTextColor: android.content.res.ColorStateList? = null
 
@@ -55,20 +54,24 @@ class ControlEditManager(
                 return !getItem(position)!!.startsWith("---")
             }
 
-            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
-                return super.getView(position, convertView, parent)
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                if (view is android.widget.TextView) {
+                    val item = getItem(position)
+                    if (item != null && item.startsWith("---")) {
+                        // If somehow a header is selected, show next valid item or just neutral text
+                        view.setTextColor(android.graphics.Color.GRAY)
+                    }
+                }
+                return view
             }
 
-            override fun getDropDownView(position: Int, convertView: View?, parent: android.view.ViewGroup): View {
+            override fun getDropDownView(position: Int, convertView: View?, parent: ViewGroup): View {
                 val view = super.getDropDownView(position, convertView, parent)
                 val isHeader = !isEnabled(position)
                 view.isEnabled = !isHeader
-                
                 if (view is android.widget.TextView) {
-                    if (defaultTextColor == null) {
-                        defaultTextColor = view.textColors
-                    }
-
+                    if (defaultTextColor == null) defaultTextColor = view.textColors
                     if (isHeader) {
                         view.setTextColor(android.graphics.Color.GRAY)
                         view.setTypeface(null, android.graphics.Typeface.BOLD)
@@ -82,20 +85,37 @@ class ControlEditManager(
         }
         keyAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.spinnerPredefinedKeys.adapter = keyAdapter
+        // Set default selection to the first valid item (usually "ENTER")
+        binding.spinnerPredefinedKeys.setSelection(1)
 
         binding.spinnerPredefinedKeys.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (position != -1 && !keyAdapter.isEnabled(position)) {
+                    // If a header is somehow selected (e.g. via keyboard or initial state), 
+                    // move to the next valid item
+                    binding.spinnerPredefinedKeys.setSelection(position + 1)
+                    return
+                }
                 updateModifierCheckboxState()
+                updateHintForCurrentSelection()
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
 
-        // Custom Payload Checkbox
         binding.checkCustomPayload.setOnCheckedChangeListener { _, isChecked ->
             binding.editCustomPayload.isEnabled = isChecked
             binding.spinnerPredefinedKeys.isEnabled = !isChecked
             updateModifierCheckboxState()
+            updateHintForCurrentSelection()
         }
+
+        binding.editCustomPayload.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                updateHintForCurrentSelection()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
 
         binding.spinnerControlType.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -103,15 +123,11 @@ class ControlEditManager(
                 val type = ControlType.valueOf(typeStr)
                 updatePanelsVisibility(type)
                 updateModifierCheckboxState()
-                
-                if (type == ControlType.MOUSE_PAD) {
-                    binding.editControlName.setText("Mouse Pad")
-                }
+                updateHintForCurrentSelection()
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
 
-        // Sensitivity SeekBars
         binding.seekSensitivity.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 val value = 0.25f + (progress * 0.25f)
@@ -130,7 +146,6 @@ class ControlEditManager(
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
         })
 
-        // Z-Index Controls
         binding.btnZIndexMinus.setOnClickListener {
             val current = binding.editZIndex.text.toString().toIntOrNull() ?: 0
             if (current > 0) binding.editZIndex.setText((current - 1).toString())
@@ -140,10 +155,8 @@ class ControlEditManager(
             if (current < 100) binding.editZIndex.setText((current + 1).toString())
         }
 
-        // Save Button
         binding.btnSaveControl.setOnClickListener {
             val control = currentControl ?: return@setOnClickListener
-            
             control.type = ControlType.valueOf(binding.spinnerControlType.selectedItem as String)
             control.name = binding.editControlName.text.toString().trim()
             control.zIndex = binding.editZIndex.text.toString().toIntOrNull()?.coerceIn(0, 100) ?: 0
@@ -170,26 +183,20 @@ class ControlEditManager(
                     }
                 }
             } else {
-                // Future: handle other types (MOUSE_PAD, etc.)
                 control.action = when(control.type) {
                     ControlType.MOUSE_PAD -> "mouse_move"
-                    //ControlType.KEYBOARD -> "system_keyboard"
-                    //ControlType.ACCELEROMETER -> "system_accel"
-                    //Implement in the future
                     else -> ""
                 }
             }
-            
             onSave(control)
             hidePanel()
         }
 
-        // Delete Button
         binding.btnDeleteControl.setOnClickListener {
             val control = currentControl ?: return@setOnClickListener
             androidx.appcompat.app.AlertDialog.Builder(binding.root.context)
                 .setTitle("Delete Control")
-                .setMessage("Are you sure you want to delete '${control.name}'?")
+                .setMessage("Are you sure you want to delete '${control.getDisplayName(gson)}'?")
                 .setPositiveButton("Delete") { _, _ ->
                     onDelete(control)
                     hidePanel()
@@ -199,19 +206,43 @@ class ControlEditManager(
         }
     }
 
+    private fun updateHintForCurrentSelection() {
+        if (isUpdatingPanel) return
+        val typeStr = binding.spinnerControlType.selectedItem as? String ?: return
+        val type = ControlType.valueOf(typeStr)
+        if (type == ControlType.MOUSE_PAD) {
+            binding.editControlName.hint = "Touchpad"
+            return
+        }
+
+        val tempControl = currentControl?.copy() ?: return
+        tempControl.type = type
+        if (binding.checkCustomPayload.isChecked) {
+            val custom = binding.editCustomPayload.text.toString()
+            tempControl.action = "key_press"
+            tempControl.payload = gson.toJson(KeyPayload(Key = custom))
+        } else {
+            val key = binding.spinnerPredefinedKeys.selectedItem as? String ?: ""
+            if (key.startsWith("MOUSE_")) {
+                tempControl.action = "mouse_button"
+                tempControl.payload = gson.toJson(MousePayload(Button = key.removePrefix("MOUSE_").lowercase()))
+            } else {
+                tempControl.action = "key_press"
+                tempControl.payload = gson.toJson(KeyPayload(Key = key))
+            }
+        }
+        val originalName = tempControl.name
+        tempControl.name = "" // Force auto-name for hint
+        binding.editControlName.hint = tempControl.getDisplayName(gson)
+        tempControl.name = originalName
+    }
+
     fun showPanel(control: ControlElement) {
         isUpdatingPanel = true
         currentControl = control
         binding.buttonEditPanel.visibility = View.VISIBLE
-        
         binding.spinnerControlType.setSelection(controlTypes.indexOf(control.type.name))
-        
-        if (control.type == ControlType.MOUSE_PAD) {
-            binding.editControlName.setText("Mouse Pad")
-        } else {
-            binding.editControlName.setText(control.name)
-        }
-
+        binding.editControlName.setText(control.name)
         binding.editZIndex.setText(control.zIndex.toString())
         
         val sensProgress = ((control.sensitivity - 0.25f) / 0.25f).toInt().coerceIn(0, 7)
@@ -223,7 +254,6 @@ class ControlEditManager(
         binding.txtScrollSensitivity.text = "Scroll Sensitivity: ${0.25f + scrollProgress * 0.25f}"
 
         updatePanelsVisibility(control.type)
-        
         if (control.type == ControlType.BUTTON) {
             try {
                 if (control.action == "mouse_button") {
@@ -234,7 +264,6 @@ class ControlEditManager(
                 } else {
                     val payload = gson.fromJson(control.payload, KeyPayload::class.java)
                     val key = payload.Key ?: ""
-                    
                     if (predefinedKeys.contains(key)) {
                         binding.checkCustomPayload.isChecked = false
                         binding.spinnerPredefinedKeys.setSelection(predefinedKeys.indexOf(key))
@@ -248,10 +277,10 @@ class ControlEditManager(
                 binding.spinnerPredefinedKeys.setSelection(0)
             }
         }
-        
         updateModifierCheckboxState()
         binding.checkIsModifier.isChecked = control.isModifier
         isUpdatingPanel = false
+        updateHintForCurrentSelection()
     }
 
     fun hidePanel() {
@@ -262,45 +291,34 @@ class ControlEditManager(
     private fun updatePanelsVisibility(type: ControlType) {
         val isButton = type == ControlType.BUTTON
         val isMousePad = type == ControlType.MOUSE_PAD
-        
         binding.editControlName.visibility = if (isMousePad) View.GONE else View.VISIBLE
-        // Label for name
-        val nameLabel = binding.editControlName.parent.let { it as? android.view.ViewGroup }?.getChildAt(
-            (binding.editControlName.parent as android.view.ViewGroup).indexOfChild(binding.editControlName) - 1
+        val nameLabel = binding.editControlName.parent.let { it as? ViewGroup }?.getChildAt(
+            (binding.editControlName.parent as ViewGroup).indexOfChild(binding.editControlName) - 1
         )
         nameLabel?.visibility = if (isMousePad) View.GONE else View.VISIBLE
-
         binding.containerModifierOption.visibility = if (isButton) View.VISIBLE else View.GONE
-        
-        val predefinedLabel = binding.spinnerPredefinedKeys.parent.let { it as? android.view.ViewGroup }?.getChildAt(
-            (binding.spinnerPredefinedKeys.parent as android.view.ViewGroup).indexOfChild(binding.spinnerPredefinedKeys) - 1
+        val predefinedLabel = binding.spinnerPredefinedKeys.parent.let { it as? ViewGroup }?.getChildAt(
+            (binding.spinnerPredefinedKeys.parent as ViewGroup).indexOfChild(binding.spinnerPredefinedKeys) - 1
         )
         predefinedLabel?.visibility = if (isButton) View.VISIBLE else View.GONE
         binding.spinnerPredefinedKeys.visibility = if (isButton) View.VISIBLE else View.GONE
-        
-        binding.checkCustomPayload.parent.let { it as? android.view.View }?.visibility = if (isButton) View.VISIBLE else View.GONE
+        binding.checkCustomPayload.parent.let { it as? View }?.visibility = if (isButton) View.VISIBLE else View.GONE
         binding.editCustomPayload.visibility = if (isButton) View.VISIBLE else View.GONE
-        val customPayloadLabel = binding.editCustomPayload.parent.let { it as? android.view.ViewGroup }?.getChildAt(
-            (binding.editCustomPayload.parent as android.view.ViewGroup).indexOfChild(binding.editCustomPayload) - 1
+        val customPayloadLabel = binding.editCustomPayload.parent.let { it as? ViewGroup }?.getChildAt(
+            (binding.editCustomPayload.parent as ViewGroup).indexOfChild(binding.editCustomPayload) - 1
         )
         customPayloadLabel?.visibility = if (isButton) View.VISIBLE else View.GONE
-
         binding.containerMousePadSettings.visibility = if (isMousePad) View.VISIBLE else View.GONE
     }
 
     private fun updateModifierCheckboxState() {
         if (isUpdatingPanel) return
-        
         val typeStr = binding.spinnerControlType.selectedItem as? String ?: return
         val type = ControlType.valueOf(typeStr)
         val isCustom = binding.checkCustomPayload.isChecked
         val selectedKey = binding.spinnerPredefinedKeys.selectedItem as? String ?: ""
-        
         val canBeModifier = type == ControlType.BUTTON && !isCustom && modifierKeys.contains(selectedKey)
-        
         binding.checkIsModifier.isEnabled = canBeModifier
-        if (!canBeModifier) {
-            binding.checkIsModifier.isChecked = false
-        }
+        if (!canBeModifier) binding.checkIsModifier.isChecked = false
     }
 }
