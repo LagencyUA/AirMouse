@@ -91,30 +91,27 @@ namespace AirMouse_Host.input
 
         public void Press(string key)
         {
-            ushort vk = GetVkCode(key);
-            if (vk == 0)
-                return;
-
-            Send(vk, false);
-            Send(vk, true);
+            if (!string.IsNullOrEmpty(key) && key.Length == 1)
+            {
+                SendUnicodeChar(key[0], false);
+                SendUnicodeChar(key[0], true);
+            }
         }
 
         public void PressDown(string key)
         {
-            ushort vk = GetVkCode(key);
-            if (vk == 0)
-                return;
-
-            Send(vk, false);
+            if (!string.IsNullOrEmpty(key) && key.Length == 1)
+            {
+                SendUnicodeChar(key[0], false);
+            }
         }
 
         public void Release(string key)
         {
-            ushort vk = GetVkCode(key);
-            if (vk == 0)
-                return;
-
-            Send(vk, true);
+            if (!string.IsNullOrEmpty(key) && key.Length == 1)
+            {
+                SendUnicodeChar(key[0], true);
+            }
         }
 
         public void Combo(List<string> keys)
@@ -199,6 +196,28 @@ namespace AirMouse_Host.input
             }
 
             return 0; // Unknown key
+        }
+
+        private void SendUnicodeChar(char c, bool keyUp)
+        {
+            var input = new NativeInput.INPUT
+            {
+                type = NativeInput.INPUT_KEYBOARD,
+                U = new NativeInput.INPUTUnion
+                {
+                    ki = new NativeInput.KEYBDINPUT
+                    {
+                        wVk = 0,
+                        wScan = c,
+                        dwFlags = NativeInput.KEYEVENTF_UNICODE | (keyUp ? NativeInput.KEYEVENTF_KEYUP : 0)
+                    }
+                }
+            };
+
+            NativeInput.SendInput(
+                1,
+                new[] { input },
+                Marshal.SizeOf<NativeInput.INPUT>());
         }
     }
 }

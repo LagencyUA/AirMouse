@@ -71,5 +71,6 @@ namespace AirMouse_Host.input
 
         public const uint KEYEVENTF_KEYDOWN = 0x0000;
         public const uint KEYEVENTF_KEYUP = 0x0002;
+        public const uint KEYEVENTF_UNICODE = 0x0004;
     }
 }
