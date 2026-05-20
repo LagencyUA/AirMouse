@@ -11,7 +11,7 @@ class MousePadHandler(
     private val onControlClick: (ControlElement) -> Unit
 ) {
     private val gson = Gson()
-    private val dragHandler = Handler(Looper.getMainLooper())
+    private val mainHandler = Handler(Looper.getMainLooper())
     
     private var touchMode = TouchMode.NONE
     private var lastX = 0f
@@ -28,6 +28,10 @@ class MousePadHandler(
 
     private val moveThreshold = 8f
     private val scrollThreshold = 6f
+    private val sendIntervalMs = 8L
+
+    private var pendingDX = 0f
+    private var pendingDY = 0f
 
     private enum class TouchMode {
         NONE, MOVE, DRAG, SCROLL
@@ -38,6 +42,22 @@ class MousePadHandler(
             sendMouseButton("left", "down")
             dragPressed = true
             touchMode = TouchMode.DRAG
+        }
+    }
+
+    private val sendMovementRunnable = object : Runnable {
+        override fun run() {
+            if (touchMode == TouchMode.MOVE || touchMode == TouchMode.DRAG) {
+                val dx = pendingDX.toInt()
+                val dy = pendingDY.toInt()
+                
+                if (dx != 0 || dy != 0) {
+                    sendMouseMove(dx, dy)
+                    pendingDX -= dx
+                    pendingDY -= dy
+                }
+                mainHandler.postDelayed(this, sendIntervalMs)
+            }
         }
     }
 
@@ -53,17 +73,20 @@ class MousePadHandler(
                 tapDownTime = System.currentTimeMillis()
                 lastX = event.x
                 lastY = event.y
+                pendingDX = 0f
+                pendingDY = 0f
                 
                 movedEnough = false
                 primaryWasMoving = false
                 secondFingerAssist = false
                 
                 touchMode = TouchMode.MOVE
-                dragHandler.postDelayed(dragRunnable, 250)
+                mainHandler.postDelayed(dragRunnable, 250)
+                mainHandler.postDelayed(sendMovementRunnable, sendIntervalMs)
             }
 
             MotionEvent.ACTION_POINTER_DOWN -> {
-                dragHandler.removeCallbacks(dragRunnable)
+                mainHandler.removeCallbacks(dragRunnable)
                 if (event.pointerCount == 2) {
                     secondFingerTapTime = System.currentTimeMillis()
                     if (primaryWasMoving) {
@@ -71,6 +94,7 @@ class MousePadHandler(
                     } else {
                         lastScrollY = (event.getY(0) + event.getY(1)) / 2f
                         touchMode = TouchMode.SCROLL
+                        mainHandler.removeCallbacks(sendMovementRunnable)
                     }
                 }
             }
@@ -83,17 +107,19 @@ class MousePadHandler(
                             val y = event.y
                             val dx = (x - lastX) * sensitivity
                             val dy = (y - lastY) * sensitivity
+                            
+                            pendingDX += dx
+                            pendingDY += dy
 
-                            if (kotlin.math.abs(dx) > moveThreshold || kotlin.math.abs(dy) > moveThreshold) {
+                            if (kotlin.math.abs(pendingDX) > moveThreshold || kotlin.math.abs(pendingDY) > moveThreshold) {
                                 movedEnough = true
                                 primaryWasMoving = true
                                 if (!dragPressed) {
-                                    dragHandler.removeCallbacks(dragRunnable)
+                                    mainHandler.removeCallbacks(dragRunnable)
                                 }
-                                sendMouseMove(dx.toInt(), dy.toInt())
-                                lastX = x
-                                lastY = y
                             }
+                            lastX = x
+                            lastY = y
                         }
                     }
                     TouchMode.SCROLL -> {
@@ -123,7 +149,10 @@ class MousePadHandler(
                         if (!movedEnough && duration < 180) {
                             sendMouseButton("right", "click")
                         }
-                        touchMode = TouchMode.NONE
+                        touchMode = TouchMode.MOVE // Return to move mode
+                        lastX = event.getX(if (event.actionIndex == 0) 1 else 0)
+                        lastY = event.getY(if (event.actionIndex == 0) 1 else 0)
+                        mainHandler.postDelayed(sendMovementRunnable, sendIntervalMs)
                     }
                     
                     val remainIndex = if (event.actionIndex == 0) 1 else 0
@@ -133,7 +162,8 @@ class MousePadHandler(
             }
 
             MotionEvent.ACTION_UP -> {
-                dragHandler.removeCallbacks(dragRunnable)
+                mainHandler.removeCallbacks(dragRunnable)
+                mainHandler.removeCallbacks(sendMovementRunnable)
                 val duration = System.currentTimeMillis() - tapDownTime
 
                 if (!movedEnough && touchMode == TouchMode.MOVE && duration < 180) {
@@ -149,7 +179,8 @@ class MousePadHandler(
             }
             
             MotionEvent.ACTION_CANCEL -> {
-                dragHandler.removeCallbacks(dragRunnable)
+                mainHandler.removeCallbacks(dragRunnable)
+                mainHandler.removeCallbacks(sendMovementRunnable)
                 if (dragPressed) {
                     sendMouseButton("left", "up")
                     dragPressed = false

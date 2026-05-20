@@ -9,66 +9,37 @@ namespace AirMouse_Host.input
 {
     internal class MouseHandler
     {
-        //private DateTime? lastMoveTime;
-        private double residualX = 0.0;
-        private double residualY = 0.0;
+        private double smoothX = 0;
+        private double smoothY = 0;
         private readonly object smoothingLock = new();
 
-        public int SmoothingIntensity { get; set; } = 25;
+        //public double SmoothingFactor { get; set; } = 0.15;
 
         public void Move(int dx, int dy)
         {
             if (dx == 0 && dy == 0)
                 return;
 
-            if (SmoothingIntensity > 1)
+            lock (smoothingLock)
             {
-                lock (smoothingLock)
+                double speed = Math.Sqrt(dx * dx + dy * dy);
+
+                double alpha = speed < 8 ? 0.5 :
+                               speed < 20 ? 0.25 :
+                               0.45;
+
+                smoothX = alpha * dx + (1.0 - alpha) * smoothX;
+                smoothY = alpha * dy + (1.0 - alpha) * smoothY;
+
+                int finalDx = (int)Math.Round(smoothX);
+                int finalDy = (int)Math.Round(smoothY);
+
+                if (finalDx == 0 && finalDy == 0)
                 {
-                    int steps = Math.Max(1, SmoothingIntensity);
-
-                    // include residuals from previous rounding
-                    double totalX = dx + residualX;
-                    double totalY = dy + residualY;
-
-                    double incX = totalX / steps;
-                    double incY = totalY / steps;
-
-                    double accX = 0.0;
-                    double accY = 0.0;
-                    int prevRoundedX = 0;
-                    int prevRoundedY = 0;
-
-                    for (int i = 0; i < steps; i++)
-                    {
-                        accX += incX;
-                        accY += incY;
-
-                        int roundedX = (int)Math.Round(accX);
-                        int roundedY = (int)Math.Round(accY);
-
-                        int stepDx = roundedX - prevRoundedX;
-                        int stepDy = roundedY - prevRoundedY;
-
-                        if (stepDx != 0 || stepDy != 0)
-                            SendMouse(stepDx, stepDy, 0, NativeInput.MOUSEEVENTF_MOVE);
-
-                        prevRoundedX = roundedX;
-                        prevRoundedY = roundedY;
-                    }
-
-                    // store residual for next packet
-                    residualX = totalX - prevRoundedX;
-                    residualY = totalY - prevRoundedY;
+                    return;
                 }
-
-                return;
+                SendMouse(finalDx, finalDy, 0, NativeInput.MOUSEEVENTF_MOVE);
             }
-
-            // not applying smoothing -> clear residuals
-            residualX = 0.0;
-            residualY = 0.0;
-            SendMouse(dx, dy, 0, NativeInput.MOUSEEVENTF_MOVE);
         }
 
 

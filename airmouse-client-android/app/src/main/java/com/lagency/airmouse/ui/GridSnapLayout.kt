@@ -68,6 +68,14 @@ class GridSnapLayout @JvmOverloads constructor(
     private var tempH: Float = 0f
 
     private val mousePadHandler by lazy { MousePadHandler { onControlClick -> onControlClickWrapper?.invoke(onControlClick) } }
+    private val keyHandler by lazy {
+        KeyHandler(
+            onControlClick = { control -> onControlClickWrapper?.invoke(control) },
+            onActivationChanged = { control, activated ->
+                findViewWithTag<View>(control)?.isActivated = activated
+            }
+        )
+    }
     private var onControlClickWrapper: ((ControlElement) -> Unit)? = null
 
     var onSelectionChanged: ((ControlElement?) -> Unit)? = null
@@ -112,61 +120,8 @@ class GridSnapLayout @JvmOverloads constructor(
         }
     }
 
-    private val activeModifiers = mutableSetOf<ControlElement>()
-    
     fun resetModifiers() {
-        activeModifiers.clear()
-        for (i in 0 until childCount) {
-            getChildAt(i).isActivated = false
-        }
-    }
-
-    private var scrollAccumulator = 0f
-    private val scrollThreshold = 10f // Threshold for cumulative scroll
-    private val baseScrollFactor = 1.5f // General scroll multiplier
-
-    private fun handleTouch(control: ControlElement, state: String, onControlClick: (ControlElement) -> Unit) {
-        if (control.isModifier) {
-            if (state == "down") {
-                if (activeModifiers.contains(control)) {
-                    activeModifiers.remove(control)
-                    findViewWithTag<View>(control)?.isActivated = false
-                } else {
-                    activeModifiers.add(control)
-                    findViewWithTag<View>(control)?.isActivated = true
-                }
-            }
-            return
-        }
-
-        // For non-modifiers, if it's a key_press and we have active modifiers
-        if (control.action == "key_press" && activeModifiers.isNotEmpty()) {
-            if (state == "down") {
-                // Send sequence: modifiers + this key
-                val payloadObj = com.google.gson.Gson().fromJson(control.payload, com.lagency.airmouse.models.KeyPayload::class.java)
-                val sequence = activeModifiers.mapNotNull { 
-                    com.google.gson.Gson().fromJson(it.payload, com.lagency.airmouse.models.KeyPayload::class.java).Key 
-                } + (payloadObj.Key ?: "")
-                
-                val newPayload = com.lagency.airmouse.models.KeyPayload(Keys = sequence, State = "press")
-                val tempControl = control.copy(action = "key_combo", payload = com.google.gson.Gson().toJson(newPayload))
-                onControlClick(tempControl)
-            }
-        } else {
-            // Normal handling with states
-            val newPayload = if (control.action == "key_press") {
-                val p = com.google.gson.Gson().fromJson(control.payload, com.lagency.airmouse.models.KeyPayload::class.java)
-                com.google.gson.Gson().toJson(p.copy(State = state))
-            } else if (control.action == "mouse_button") {
-                val p = com.google.gson.Gson().fromJson(control.payload, com.lagency.airmouse.models.MousePayload::class.java)
-                com.google.gson.Gson().toJson(p.copy(State = if (state == "down") "down" else "up"))
-            } else {
-                control.payload
-            }
-            
-            val tempControl = control.copy(payload = newPayload)
-            onControlClick(tempControl)
-        }
+        keyHandler.resetModifiers()
     }
 
     private fun refreshViews(onControlClick: (ControlElement) -> Unit) {
@@ -199,11 +154,11 @@ class GridSnapLayout @JvmOverloads constructor(
                     when (event.action) {
                         MotionEvent.ACTION_DOWN -> {
                             v.isPressed = true
-                            handleTouch(control, "down", onControlClick)
+                            keyHandler.handleTouch(control, "down")
                         }
                         MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                             v.isPressed = false
-                            handleTouch(control, "up", onControlClick)
+                            keyHandler.handleTouch(control, "up")
                         }
                     }
                     true

@@ -11,7 +11,7 @@ class SettingsManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_SERVER_IP, value).apply()
 
     var serverPort: Int
-        get() = prefs.getInt(KEY_SERVER_PORT, 8888)
+        get() = prefs.getInt(KEY_SERVER_PORT, 5000)
         set(value) = prefs.edit().putInt(KEY_SERVER_PORT, value).apply()
 
     var trustedToken: String?
