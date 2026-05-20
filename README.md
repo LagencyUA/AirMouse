@@ -72,7 +72,7 @@ The project is built using a **monorepository** approach and consists of two mai
 
 1. **Склонуйте репозиторій:**
 ```bash
-git clone [https://github.com/your-username/AirMouse-Project.git
+git clone https://github.com/your-username/AirMouse-Project.git
 ```
 
 2. **Збірка хоста Windows (Сервер):**
