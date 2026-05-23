@@ -111,6 +111,7 @@ class GridSnapLayout @JvmOverloads constructor(
     fun getSelectedControl(): ControlElement? = selectedChild?.tag as? ControlElement
 
     fun setLayout(data: LayoutData, onControlClick: (ControlElement) -> Unit) {
+        keyboardHandler.hideKeyboard()
         val prevSelectedId = (selectedChild?.tag as? ControlElement)?.id
         this.layoutData = data
         this.onControlClickWrapper = onControlClick

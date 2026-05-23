@@ -63,7 +63,7 @@ class KeyboardHandler(
                 // Enable suggestions and standard text input
                 inputType = android.text.InputType.TYPE_CLASS_TEXT
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                imeOptions = EditorInfo.IME_ACTION_DONE
+                imeOptions = EditorInfo.IME_ACTION_NONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
                 
                 // Use a stable character for the base so we can detect deletions
                 setText(" ")
@@ -111,6 +111,13 @@ class KeyboardHandler(
     private fun syncDelta(current: String) {
         val modifiers = getActiveModifiers()
         
+        // Handle Enter key if it was just pressed (detected as \n in current text)
+        if (current.endsWith("\n")) {
+            handleSpecialKey("ENTER")
+            resetBuffer()
+            return
+        }
+
         if (modifiers.isNotEmpty()) {
             // In combo mode, we process character by character and reset frequently
             if (current.length > lastSentText.length) {
@@ -131,8 +138,9 @@ class KeyboardHandler(
         }
         
         // 2. Backspace for removed part
-        val toDelete = lastSentText.length - commonLen
-        if (toDelete > 0) {
+        if (lastSentText.length > commonLen) {
+            val removedPart = lastSentText.substring(commonLen)
+            val toDelete = removedPart.codePointCount(0, removedPart.length)
             repeat(toDelete) { handleSpecialKey("BACKSPACE") }
         }
         
@@ -172,6 +180,12 @@ class KeyboardHandler(
                 }
             }, 100)
         }
+    }
+
+    fun hideKeyboard() {
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.hideSoftInputFromWindow(hiddenEditText?.windowToken, 0)
+        hiddenEditText?.clearFocus()
     }
 
     private fun handleInput(text: String) {
