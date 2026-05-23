@@ -24,8 +24,8 @@ namespace AirMouse_Host.input
             {
                 double speed = Math.Sqrt(dx * dx + dy * dy);
 
-                double alpha = speed < 8 ? 0.5 :
-                               speed < 20 ? 0.25 :
+                double alpha = speed < 8 ? 0.25 :
+                               speed < 20 ? 0.5 :
                                0.45;
 
                 smoothX = alpha * dx + (1.0 - alpha) * smoothX;

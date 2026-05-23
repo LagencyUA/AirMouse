@@ -65,7 +65,7 @@ namespace AirMouse_Host
         {
             menu = new ContextMenuStrip();
             // App name and version
-            var appName = new ToolStripLabel("AirMouse v0.2.0");
+            var appName = new ToolStripLabel("AirMouse v1.0.0");
             menu.Items.Add(appName);
             menu.Items.Add(new ToolStripSeparator());
 

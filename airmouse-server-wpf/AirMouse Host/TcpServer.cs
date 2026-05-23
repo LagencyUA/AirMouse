@@ -14,6 +14,7 @@ namespace AirMouse_Host
     {
         private TcpListener server;
         private readonly AuthManager auth;
+        private readonly object sessionLock = new();
         public Session CurrentSession { get; private set; }
         public event Action<string> OnStatusChanged;
 
@@ -65,13 +66,18 @@ namespace AirMouse_Host
             string type = doc.RootElement.GetProperty("Type").GetString();
 
             if (type == "auth")
+            {
                 HandleAuth(client, json);
 
-            if (CurrentSession == null)
-            {
-                System.Diagnostics.Debug.WriteLine("No active session, ignoring commands");
-                return;
+                // If this client did not become the active session, close and exit.
+                if (CurrentSession == null || CurrentSession.Client != client)
+                {
+                    try { client.Close(); } catch { }
+                    System.Diagnostics.Debug.WriteLine("Client not accepted (another session active) - closing");
+                    return;
+                }
             }
+
 
             while (CurrentSession != null)
             {
@@ -93,36 +99,65 @@ namespace AirMouse_Host
                     break;
                 }
             }
-            Disconnect();
+
+            // Only disconnect global session if this client is the active session
+            if (CurrentSession != null && CurrentSession.Client == client)
+            {
+                Disconnect();
+            }
+            else
+            {
+                try { client.Close(); } catch { }
+            }
         }
 
         private void HandleAuth(TcpClient client, string json)
         {
             var packet = JsonSerializer.Deserialize<AuthPacket>(json);
             var stream = client.GetStream();
-            bool valid = auth.Validate(packet.Pin);
-            var response = new AuthResponse
-            {
-                Success = valid,
-                Message = valid ? "connected" : "invalid pin"
-            };
 
-            string responseJson = JsonSerializer.Serialize(response) + "\n"; // For line by line
-            byte[] bytes = Encoding.UTF8.GetBytes(responseJson);
-            stream.Write(bytes, 0, bytes.Length);
-
-            if (!valid)
+            // If there is already an active session, refuse additional connections
+            lock (sessionLock)
             {
-                client.Close();
-                return;
+                if (CurrentSession != null)
+                {
+                    var busyResponse = new AuthResponse
+                    {
+                        Success = false,
+                        Message = "another device is already connected"
+                    };
+
+                    string busyJson = JsonSerializer.Serialize(busyResponse) + "\n";
+                    byte[] busyBytes = Encoding.UTF8.GetBytes(busyJson);
+                    try { stream.Write(busyBytes, 0, busyBytes.Length); } catch { }
+                    try { client.Close(); } catch { }
+                    return;
+                }
+
+                bool valid = auth.Validate(packet.Pin);
+                var response = new AuthResponse
+                {
+                    Success = valid,
+                    Message = valid ? "connected" : "invalid pin"
+                };
+
+                string responseJson = JsonSerializer.Serialize(response) + "\n"; // For line by line
+                byte[] bytes = Encoding.UTF8.GetBytes(responseJson);
+                try { stream.Write(bytes, 0, bytes.Length); } catch { }
+
+                if (!valid)
+                {
+                    try { client.Close(); } catch { }
+                    return;
+                }
+
+                CurrentSession = new Session
+                {
+                    Client = client,
+                    DeviceName = packet.DeviceName,
+                    ConnectedAt = DateTime.Now
+                };
             }
-
-            CurrentSession = new Session
-            {
-                Client = client,
-                DeviceName = packet.DeviceName,
-                ConnectedAt = DateTime.Now
-            };
 
             OnStatusChanged?.Invoke(packet.DeviceName);
             System.Diagnostics.Debug.WriteLine("Session started!");
