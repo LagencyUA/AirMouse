@@ -69,7 +69,31 @@ class GridSnapLayout @JvmOverloads constructor(
     private var tempW: Float = 0f
     private var tempH: Float = 0f
 
+    private var gyroDownTime = 0L
+    private val gyroLongPressTimeout = 200L
+
     private val mousePadHandler by lazy { MousePadHandler { onControlClick -> onControlClickWrapper?.invoke(onControlClick) } }
+    private val gyroMouseHandler by lazy { 
+        GyroMouseHandler(
+            context = context,
+            onActivationChanged = { activated ->
+                // Find and update the gyro button visual state
+                for (i in 0 until childCount) {
+                    val child = getChildAt(i)
+                    val control = child.tag as? ControlElement
+                    if (control?.type == ControlType.GYRO_MOUSE) {
+                        child.isActivated = activated
+                    }
+                }
+            },
+            onSendPacket = { action, payload ->
+                onControlClickWrapper?.invoke(ControlElement(
+                    id = "gyro_temp", name = "", x = 0, y = 0, width = 0, height = 0,
+                    action = action, payload = payload
+                ))
+            }
+        )
+    }
     private val keyHandler by lazy {
         KeyHandler(
             onControlClick = { control -> onControlClickWrapper?.invoke(control) },
@@ -179,6 +203,25 @@ class GridSnapLayout @JvmOverloads constructor(
                     
                     if (control.type == ControlType.MOUSE_PAD) {
                         mousePadHandler.handleTouch(control, event)
+                        return@setOnTouchListener true
+                    }
+
+                    if (control.type == ControlType.GYRO_MOUSE) {
+                        when (event.action) {
+                            MotionEvent.ACTION_DOWN -> {
+                                v.isPressed = true
+                                gyroDownTime = System.currentTimeMillis()
+                            }
+                            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                                v.isPressed = false
+                                if (System.currentTimeMillis() - gyroDownTime >= gyroLongPressTimeout) {
+                                    gyroMouseHandler.reset()
+                                } else {
+                                    gyroMouseHandler.toggle()
+                                }
+                                gyroDownTime = 0
+                            }
+                        }
                         return@setOnTouchListener true
                     }
 

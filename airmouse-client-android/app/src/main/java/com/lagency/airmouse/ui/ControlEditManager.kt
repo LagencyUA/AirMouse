@@ -186,6 +186,7 @@ class ControlEditManager(
                 control.action = when(control.type) {
                     ControlType.MOUSE_PAD -> "mouse_move"
                     ControlType.KEYBOARD -> "keyboard_text"
+                    ControlType.GYRO_MOUSE -> "mouse_move"
                     else -> ""
                 }
             }
@@ -211,8 +212,13 @@ class ControlEditManager(
         if (isUpdatingPanel) return
         val typeStr = binding.spinnerControlType.selectedItem as? String ?: return
         val type = ControlType.valueOf(typeStr)
-        if (type == ControlType.MOUSE_PAD || type == ControlType.KEYBOARD) {
-            binding.editControlName.hint = if (type == ControlType.MOUSE_PAD) "Touchpad" else "Keyboard"
+        if (type == ControlType.MOUSE_PAD || type == ControlType.KEYBOARD || type == ControlType.GYRO_MOUSE) {
+            binding.editControlName.hint = when(type) {
+                ControlType.MOUSE_PAD -> "Touchpad"
+                ControlType.KEYBOARD -> "Keyboard"
+                ControlType.GYRO_MOUSE -> "Gyro Mouse"
+                else -> ""
+            }
             return
         }
 
@@ -293,12 +299,13 @@ class ControlEditManager(
         val isButton = type == ControlType.BUTTON
         val isMousePad = type == ControlType.MOUSE_PAD
         val isKeyboard = type == ControlType.KEYBOARD
+        val isGyro = type == ControlType.GYRO_MOUSE
 
-        binding.editControlName.visibility = if (isMousePad || isKeyboard) View.GONE else View.VISIBLE
+        binding.editControlName.visibility = if (isMousePad || isKeyboard || isGyro) View.GONE else View.VISIBLE
         val nameLabel = binding.editControlName.parent.let { it as? ViewGroup }?.getChildAt(
             (binding.editControlName.parent as ViewGroup).indexOfChild(binding.editControlName) - 1
         )
-        nameLabel?.visibility = if (isMousePad || isKeyboard) View.GONE else View.VISIBLE
+        nameLabel?.visibility = if (isMousePad || isKeyboard || isGyro) View.GONE else View.VISIBLE
         
         binding.containerModifierOption.visibility = if (isButton) View.VISIBLE else View.GONE
         
@@ -315,7 +322,7 @@ class ControlEditManager(
         )
         customPayloadLabel?.visibility = if (isButton) View.VISIBLE else View.GONE
         
-        binding.containerMousePadSettings.visibility = if (isMousePad) View.VISIBLE else View.GONE
+        binding.containerMousePadSettings.visibility = if (isMousePad || isGyro) View.VISIBLE else View.GONE
         
         // Z-Index settings are now always visible for all types as requested
         val zIndexContainer = binding.editZIndex.parent as? View

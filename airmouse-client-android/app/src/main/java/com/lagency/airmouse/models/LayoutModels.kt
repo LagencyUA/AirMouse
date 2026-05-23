@@ -6,6 +6,7 @@ enum class ControlType {
     BUTTON,
     MOUSE_PAD,
     KEYBOARD,
+    GYRO_MOUSE,
 //    ACCELEROMETER
 //Implement in the future
 }
@@ -38,6 +39,7 @@ data class ControlElement(
         return when (type) {
             ControlType.MOUSE_PAD -> "Touchpad"
             ControlType.KEYBOARD -> "Keyboard"
+            ControlType.GYRO_MOUSE -> "Gyro Mouse"
             ControlType.BUTTON -> {
                 when (action) {
                     "mouse_button" -> {
