@@ -9,11 +9,28 @@ namespace AirMouse_Host.input
 {
     internal class MouseHandler
     {
+        // EMA smoothing
         private double smoothX = 0;
         private double smoothY = 0;
         private readonly object smoothingLock = new();
 
-        //public double SmoothingFactor { get; set; } = 0.15;
+
+        // Interpolation
+        private double targetX = 0;
+        private double targetY = 0;
+        private double remainedX = 0;
+        private double remainedY = 0;
+
+        private readonly CancellationTokenSource cts = new();
+        private readonly Task interpolationTask;
+
+        public double interpolationAlpha { get; set; } = 0.5; // Adjust this for smoother or more responsive movement
+        public int InterpolationInterval { get; set; } = 6; // ms
+
+        public MouseHandler()
+        {
+            interpolationTask = Task.Run(InterpolationLoop);
+        }
 
         public void Move(int dx, int dy)
         {
@@ -24,24 +41,58 @@ namespace AirMouse_Host.input
             {
                 double speed = Math.Sqrt(dx * dx + dy * dy);
 
-                double alpha = speed < 8 ? 0.25 :
-                               speed < 20 ? 0.5 :
-                               0.45;
+                double alpha = speed < 3 ? 0.22 :
+                               speed < 10 ? 0.38 :
+                               speed < 25 ? 0.54 :
+                               0.70;
 
                 smoothX = alpha * dx + (1.0 - alpha) * smoothX;
                 smoothY = alpha * dy + (1.0 - alpha) * smoothY;
 
-                int finalDx = (int)Math.Round(smoothX);
-                int finalDy = (int)Math.Round(smoothY);
-
-                if (finalDx == 0 && finalDy == 0)
-                {
-                    return;
-                }
-                SendMouse(finalDx, finalDy, 0, NativeInput.MOUSEEVENTF_MOVE);
+                targetX += smoothX;
+                targetY += smoothY;
             }
         }
 
+        private async Task InterpolationLoop()
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                double moveX, moveY;
+
+                lock (smoothingLock)
+                {
+                    moveX = targetX * interpolationAlpha;
+                    moveY = targetY * interpolationAlpha;
+
+                    targetX -= moveX;
+                    targetY -= moveY;
+                }
+
+                double totalX = moveX + remainedX;
+                double totalY = moveY + remainedY;
+
+                int finalDx = (int)Math.Round(totalX);
+                int finalDy = (int)Math.Round(totalY);
+
+                remainedX = totalX - finalDx;
+                remainedY = totalY - finalDy;
+
+                if (finalDx != 0 || finalDy != 0)
+                {
+                    SendMouse(finalDx, finalDy, 0, NativeInput.MOUSEEVENTF_MOVE);
+                }
+
+                try
+                {
+                    await Task.Delay(InterpolationInterval, cts.Token);
+                }
+                catch
+                {
+                    break;
+                }
+            }
+        }
 
         public void Click(string button, string state)
         {
